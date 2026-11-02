@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Lab · proceso</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Inter:wght@400..800&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <style>
+    /* Vista incrustada (iframe): sin cabecera, sin pie, fondo transparente y alto ajustado al contenido. */
+    body.embed { min-height: 0; display: block; background: transparent; }
+    body.embed::before { display: none; }
+    /* alto fijo: el iframe no depende de medir el contenido (que falla si la pestaña no se pinta) */
+    .embed-card { margin: 2px; padding: 16px 18px 14px; height: 436px; overflow: auto; display: flex; flex-direction: column; }
+    .embed-card > div:nth-child(3) { flex: 1; min-height: 0; }
+    .embed-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .embed-head h3 { font: 600 15px/1.35 var(--font-ui); margin: 4px 0 0; }
+    .embed-head .kpis { flex: none; }
+    .embed-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .embed-foot a { font-size: 12.5px; font-weight: 600; }
+    .embed .narrative { margin-top: 10px; }
+    .embed .subtabs { margin: 0 0 10px; }
+  </style>
+</head>
+<body class="embed">
+  <div id="embed"><div class="empty small"><span class="spinner"></span></div></div>
+  <script>
+    // diagnóstico: en un iframe aislado la consola no es accesible; los errores se envían a la página que lo incrusta
+    addEventListener("error", (e) => parent.postMessage({ type: "raglab:error", message: String(e.message || e.error) }, "*"));
+    addEventListener("unhandledrejection", (e) => parent.postMessage({ type: "raglab:error", message: String(e.reason && (e.reason.stack || e.reason)) }, "*"));
+  </script>
+  <script type="module" src="/static/js/embed.js"
+    onerror="parent.postMessage({ type: 'raglab:error', message: 'No se pudo cargar el módulo de la vista (¿RAG Lab no accesible desde el navegador?)' }, '*')"></script>
+</body>
+</html>

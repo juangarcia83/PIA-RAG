@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "raglab",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["run.py", "--port", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "openwebui",
+      "runtimeExecutable": ".venv-owui/Scripts/python.exe",
+      "runtimeArgs": ["integrations/openwebui/run_openwebui.py"],
+      "port": 3000
+    }
+  ]
+}

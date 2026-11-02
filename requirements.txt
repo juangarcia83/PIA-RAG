@@ -1,0 +1,29 @@
+# RAG Lab · Python 3.11 o superior (probado con 3.12)
+#
+#   pip install -r requirements.txt
+#
+# GPU NVIDIA: instala ANTES PyTorch con CUDA (https://pytorch.org/get-started/locally/).
+# Sin GPU, pip instala la build de CPU de PyTorch al instalar sentence-transformers.
+
+# --- Servidor web
+fastapi>=0.110
+uvicorn[standard]>=0.29
+
+# --- Datos
+numpy>=1.26
+pandas>=2.1
+requests>=2.31                  # cliente del LLM (API tipo OpenAI) y descarga del DOGV
+tqdm>=4.66                      # barras de progreso al indexar desde la línea de comandos
+
+# --- Embeddings y reranking (arrastran torch)
+sentence-transformers==6.1.0
+transformers>=5.16,<6
+huggingface-hub>=1.5,<2         # transformers 5.x no funciona con huggingface-hub 2.x
+
+# --- Retrieval léxico
+bm25s==0.3.12
+scipy>=1.11                     # lo usa bm25s
+snowballstemmer>=2.2            # stemming en catalán/castellano para BM25
+
+# --- Descarga de muestras del DOGV (scripts/download_dogv.py)
+pymupdf>=1.24                   # PDF -> Markdown

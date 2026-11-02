@@ -1,0 +1,23 @@
+[project]
+name = "rag-lab-dogv"
+version = "1.0.0"
+description = "RAG Lab: web interactiva para comparar arquitecturas RAG sobre el DOGV"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["data", "indexes", "integrations/openwebui/data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",   # líneas largas: los textos de la interfaz y los prompts se dejan enteros
+    "B008",   # llamadas en valores por defecto (patrón de FastAPI/pydantic)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "dogvrag"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

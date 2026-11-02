@@ -1,0 +1,4 @@
+# Finales de línea LF en el repositorio (evita avisos y diffs falsos entre Windows y Linux)
+* text=auto eol=lf
+*.png binary
+*.npy binary

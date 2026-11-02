@@ -1,0 +1,16 @@
+{
+  "corpus_root": "data/DOGV_SAMPLE",
+  "variant": "pymupdf",
+  "langs": ["va"],
+  "max_docs": null,
+  "embed_model": "auto",
+  "rerank_model": "BAAI/bge-reranker-v2-m3",
+  "llm_base_url": "https://api.deepseek.com",
+  "llm_model": "deepseek-flash",
+  "llm_api_key_env": "DEEPSEEK_API_KEY",
+  "answer_lang": "va",
+  "top_k": 5,
+  "tau_ok": 0.5,
+  "tau_abstain": 0.05,
+  "agent_max_steps": 4
+}

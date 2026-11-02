@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------- secretos (nunca al repositorio)
+.env
+.env.*
+!.env.example
+*.env
+*.key
+*.pem
+*.p12
+*.pfx
+.webui_secret_key
+secrets/
+settings.json
+.claude/settings.local.json
+
+# ---------------------------------------------------------------- datos y cachés generados
+# El corpus se descarga con scripts/download_dogv.py: contiene nombres y correos publicados en el DOGV.
+data/
+indexes/
+integrations/openwebui/data/
+*.db
+*.sqlite
+*.sqlite3
+
+# ---------------------------------------------------------------- entornos y cachés de Python
+.venv/
+.venv-*/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# ---------------------------------------------------------------- sistema y editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
