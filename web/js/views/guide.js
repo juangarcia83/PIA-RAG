@@ -144,6 +144,11 @@ export function guideView(root) {
       graph.done(id, s.meta || "", null, { particles: k === step, variant: s.variant, to: s.to });
     });
     graph.focus(tour[step][0]);
+    // en pantallas estrechas el grafo se desplaza en horizontal: se centra la etapa actual
+    const node = graph.nodeEls[tour[step][0]]?.getBoundingClientRect(), wrap = box.getBoundingClientRect();
+    if (node && box.scrollWidth > box.clientWidth) {
+      box.scrollBy({ left: node.left + node.width / 2 - (wrap.left + wrap.width / 2), behavior: "smooth" });
+    }
     const s = { ...STAGES[tour[step][0]], ...tour[step][1] };
     counter.textContent = t("Etapa {n} de {m}", { n: step + 1, m: tour.length });
     title.textContent = s.title;

@@ -24,6 +24,8 @@ function route({ keepScroll = false, focus = false } = {}) {
   const view = ROUTES[name] ? name : "ask";
   $$(".tab").forEach((tab) => (tab.dataset.route === view ? tab.setAttribute("aria-current", "page") : tab.removeAttribute("aria-current")));
   document.title = `${t(TITLES[view])} · RAG Lab · DOGV`;
+  $("#menu-current").textContent = t(TITLES[view]);
+  setMenu(false);
   moveTabInk();
   if (current?.destroy) current.destroy();
   const y = scrollY;
@@ -42,6 +44,21 @@ function route({ keepScroll = false, focus = false } = {}) {
 
 $$(".tab").forEach((tab) => tab.addEventListener("click", () => { location.hash = `#/${tab.dataset.route}`; }));
 addEventListener("hashchange", () => route({ focus: true }));
+// menú de secciones en móvil y tablet (en pantallas anchas las pestañas se ven siempre y el botón no aparece)
+function setMenu(open) {
+  $(".nav").classList.toggle("menu-open", open);
+  $("#menu-btn").setAttribute("aria-expanded", open);
+}
+$("#menu-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const open = !$(".nav").classList.contains("menu-open");
+  setMenu(open);
+  if (open) $('.tab[aria-current="page"]')?.focus();
+});
+document.addEventListener("click", (e) => { if (!$("#sections").contains(e.target)) setMenu(false); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $(".nav").classList.contains("menu-open")) { setMenu(false); $("#menu-btn").focus(); }
+});
 // «Saltar al contenido»: la app enruta por el hash, así que el enlace no puede cambiarlo
 $(".skip-link").addEventListener("click", (e) => { e.preventDefault(); $("#app").focus(); });
 
@@ -64,7 +81,10 @@ function applyThemeIcon() {
   const btn = $("#theme-btn");
   btn.replaceChildren(icon(isDark() ? "sun" : "moon"));
   btn.setAttribute("aria-label", isDark() ? t("Cambiar a tema claro") : t("Cambiar a tema oscuro"));
+  // la barra del navegador del móvil toma el color de fondo del tema
+  $("#theme-color").setAttribute("content", getComputedStyle(document.body).backgroundColor);
 }
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyThemeIcon());
 $("#theme-btn").addEventListener("click", () => {
   document.documentElement.dataset.theme = isDark() ? "light" : "dark";
   try { localStorage.setItem("raglab.theme", document.documentElement.dataset.theme); } catch {}

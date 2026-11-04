@@ -129,7 +129,8 @@ function showCite(anchor, c, chunker) {
   citePop.setAttribute("aria-label", t("Fuente {n}", { n: c.n }));
   citePop.replaceChildren(
     h("div", { class: "cite-pop-head" }, h("span", { class: "src-n", "aria-hidden": "true" }, c.n),
-      h("div", { class: "src-title", translate: "no" }, short(c.title || t("(sin título)"), 170))),
+      h("div", { class: "src-title", translate: "no" }, short(c.title || t("(sin título)"), 170)),
+      h("button", { class: "icon-btn cite-pop-close", "aria-label": t("Cerrar"), onclick: () => hideCite(true) }, icon("close"))),
     h("div", { class: "src-meta" }, h("span", { class: "mono" }, c.code), h("span", {}, fmtDate(c.date)), h("span", {}, short(c.organismo, 48))),
     h("p", { class: "cite-pop-text", translate: "no", tabindex: 0 }, citeExcerpt(c)),
     h("div", { class: "src-actions" },
@@ -176,7 +177,12 @@ export function askView(root, state, { restore = false } = {}) {
   // ---------- cabecera y búsqueda
   const ta = h("textarea", { rows: 1, placeholder: t("Pregunta lo que quieras sobre el DOGV…"), "aria-label": t("Pregunta") });
   const go = h("button", { class: "search-go", "aria-label": t("Preguntar"), disabled: true }, icon("up"));
-  const autosize = () => { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; go.disabled = !ta.value.trim(); };
+  const autosize = () => {
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+    ta.style.overflowY = ta.scrollHeight > 180 ? "auto" : "hidden";   // barra de desplazamiento solo si no cabe (max-height)
+    go.disabled = !ta.value.trim();
+  };
   ta.addEventListener("input", autosize);
   ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } });
   go.addEventListener("click", () => submit());
