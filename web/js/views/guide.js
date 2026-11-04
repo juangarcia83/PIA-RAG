@@ -75,7 +75,8 @@ const STEP_MS = 2800;
 export function guideView(root) {
   let pipeline = store("guidePipeline") || "advanced";
   if (!TOURS[pipeline]) pipeline = "advanced";
-  let step = 0, playing = true, timer = null, graph = null;
+  // sin reproducción automática si el sistema pide reducir el movimiento
+  let step = 0, playing = !matchMedia("(prefers-reduced-motion: reduce)").matches, timer = null, graph = null;
 
   const box = h("div", { class: "pipe-wrap" });
   const counter = h("span", { class: "guide-counter" });

@@ -305,15 +305,29 @@ class Engine:
         cfg["reranker"] = getattr(getattr(p, "reranker", None), "name", None)
         return cfg
 
+    def standalone_question(self, question: str, history: list[dict] | None) -> str:
+        """Reescribe una pregunta de seguimiento como pregunta completa con la conversación (si hay LLM)."""
+        if not history or not self.generator.available:
+            return question
+        try:
+            out = self.generator.generate(prompts.build_condense_messages(question, history, self.s.answer_lang),
+                                          max_tokens=160, temperature=0.0)
+        except Exception:   # sin reescritura se busca con la pregunta tal cual
+            return question
+        lines = [x.strip().strip("\"«»").strip() for x in out.splitlines() if x.strip()]
+        return lines[0] if lines else question
+
     def run(self, question: str, name: str, filters: dict | None, options: dict | None, generate: bool,
-            emit: Emit) -> None:
+            emit: Emit, history: list[dict] | None = None) -> None:
         pipe = self.pipelines[name]
         flt = self.filters(filters)
         with self.lock:
+            original, question = question, self.standalone_question(question, history)
             gen = None if (generate and self.generator.available) else NullGenerator("generación desactivada")
             with overrides(pipe, options or {}, generator=gen):
                 rec = Recorder(self, pipe, emit)
                 emit({"type": "start", "t": 0, "pipeline": name, "question": question,
+                      "original": original if question != original else None,
                       "config": self.pipeline_config(name), "llm": self.llm_status() if gen is None else None,
                       "filters": {k: v for k, v in vars(flt).items() if v is not None} if flt else {},
                       "filtered_chunks": int(flt.mask(pipe.index.chunks).sum()) if flt else len(pipe.index)})
@@ -334,7 +348,7 @@ class Engine:
                     messages = prompts.build_messages(question, result.contexts, pipe.answer_lang)
                 trace = {k: v for k, v in result.trace.items() if k != "timings"}
                 index_name = PIPELINE_INFO[name]["index"]
-                emit({"type": "result", "t": rec.now(), "pipeline": name, "answer": result.answer,
+                emit({"type": "result", "t": rec.now(), "pipeline": name, "question": question, "answer": result.answer,
                       "contexts": contexts, "timings": {k: round(v * 1000, 1) for k, v in result.timings.items()},
                       "total_ms": round(result.total_seconds * 1000, 1), "trace": trace, "messages": messages,
                       "query_tokens": rec.query_tokens, "index": index_name,

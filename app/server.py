@@ -55,6 +55,7 @@ app = FastAPI(title="RAG Lab · DOGV", docs_url="/api/docs", lifespan=lifespan)
 PUBLIC = os.environ.get("RAGLAB_PUBLIC", "").lower() in ("1", "true", "yes")
 RUNS: OrderedDict[str, dict] = OrderedDict()   # ejecuciones recientes, para reabrirlas o incrustarlas
 MAX_RUNS = 300
+HISTORY_TURNS = 4                                # turnos de conversación que se usan para entender un seguimiento
 
 # Las vistas incrustadas (iframes sin «same origin» en Open WebUI) cargan módulos y datos desde otro origen.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
@@ -127,12 +128,18 @@ def examples(n: int = 8, seed: int | None = None):
 # --------------------------------------------------------------------------- consultas
 
 
+class ChatTurn(BaseModel):
+    question: str
+    answer: str = ""
+
+
 class RunRequest(BaseModel):
     question: str
     pipeline: str = "advanced"
     filters: dict = Field(default_factory=dict)
     options: dict = Field(default_factory=dict)
     generate: bool = True
+    history: list[ChatTurn] = Field(default_factory=list)   # turnos anteriores de la conversación (modo simple)
 
 
 @app.post("/api/run")
@@ -159,7 +166,8 @@ def run(req: RunRequest):
 
     def worker():
         try:
-            engine.run(req.question.strip(), req.pipeline, req.filters, req.options, req.generate, emit)
+            history = [t.model_dump() for t in req.history[-HISTORY_TURNS:]]
+            engine.run(req.question.strip(), req.pipeline, req.filters, req.options, req.generate, emit, history=history)
         except Exception as exc:  # el error llega a la interfaz como un evento más
             emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
         finally:

@@ -95,6 +95,23 @@ HYDE = {
     ),
 }
 
+# Conversación: antes de buscar, una pregunta de seguimiento («i quin termini hi ha?») se reescribe como pregunta
+# completa con lo que se ha hablado, para que el retrieval no dependa del historial.
+CONDENSE = {
+    "va": (
+        "Reescriu l'última pregunta de l'usuari perquè s'entenga sense la conversa: completa-la amb els noms, "
+        "llocs, dates o disposicions a què es referix. Si ja s'entén sola, torna-la igual. No la respongues. "
+        "Escriu només la pregunta.\n\nConversa:\n{history}\n\nÚltima pregunta: {question}\n\nPregunta completa:"
+    ),
+    "es": (
+        "Reescribe la última pregunta del usuario para que se entienda sin la conversación: complétala con los "
+        "nombres, lugares, fechas o disposiciones a los que se refiere. Si ya se entiende sola, devuélvela igual. "
+        "No la respondas. Escribe solo la pregunta.\n\nConversación:\n{history}\n\nÚltima pregunta: {question}\n\n"
+        "Pregunta completa:"
+    ),
+}
+_TURN_LABELS = {"va": ("Usuari", "Assistent"), "es": ("Usuario", "Asistente")}
+
 # Agentic RAG: el LLM no responde, planifica. En cada paso elige una herramienta (search, read, finish) y la
 # respuesta final la redacta el prompt SYSTEM con las evidencias que el agente selecciona. El protocolo es un
 # objeto JSON por turno (no function calling nativo) para que funcione con cualquier servidor tipo OpenAI.
@@ -206,3 +223,11 @@ def build_messages(question: str, contexts: list[Context], lang: str = "va") -> 
         {"role": "system", "content": SYSTEM[lang]},
         {"role": "user", "content": USER[lang].format(contexts=format_contexts(contexts), question=question)},
     ]
+
+
+def build_condense_messages(question: str, history: list[dict], lang: str = "va") -> list[dict[str, str]]:
+    """Mensajes para reescribir `question` como pregunta completa. `history`: [{"question", "answer"}, ...]."""
+    lang = lang if lang in CONDENSE else "va"
+    user, assistant = _TURN_LABELS[lang]
+    turns = "\n".join(f"{user}: {t['question']}\n{assistant}: {t['answer']}" for t in history)
+    return [{"role": "user", "content": CONDENSE[lang].format(history=turns, question=question)}]

@@ -59,7 +59,7 @@ addEventListener("pointermove", (ev) => {
 // ------------------------------------------------------------------ indicador deslizante de la navegación
 export function moveTabInk() {
   const tabs = document.querySelector(".tabs");
-  const sel = tabs?.querySelector('.tab[aria-selected="true"]');
+  const sel = tabs?.querySelector('.tab[aria-current="page"]');
   if (!tabs || !sel) return;
   let ink = tabs.querySelector(".tab-ink");
   if (!ink) {

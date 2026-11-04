@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>RAG Lab · DOGV</title>
-  <meta name="description" content="Laboratorio interactivo para comparar arquitecturas RAG sobre el Diari Oficial de la Generalitat Valenciana.">
+  <meta name="description" content="Laboratori interactiu per a comparar arquitectures RAG sobre el Diari Oficial de la Generalitat Valenciana.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%231a0088'/%3E%3Cstop offset='.5' stop-color='%23390092'/%3E%3Cstop offset='1' stop-color='%2341b8ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M10 23V9h7a4.5 4.5 0 0 1 0 9h-7m7 0 5 5' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,6 +15,7 @@
   </script>
 </head>
 <body>
+  <a class="skip-link" href="#app" data-i18n>Saltar al contenido</a>
   <header class="nav">
     <a class="brand" href="#/ask" aria-label="RAG Lab DOGV · ValgrAI y Generalitat Valenciana, inicio">
       <img class="logo-valgrai logo-light" src="/static/img/valgrai-logo.svg" alt="ValgrAI">
@@ -23,24 +24,24 @@
       <span class="sep" aria-hidden="true"></span>
       <span class="app"><b>RAG Lab</b><span>Diari Oficial · DOGV</span></span>
     </a>
-    <nav class="tabs" role="tablist" data-i18n-label="Secciones" aria-label="Secciones">
-      <button class="tab" role="tab" data-route="ask"><span class="num">01</span><span data-i18n>Preguntar</span></button>
-      <button class="tab" role="tab" data-route="compare"><span class="num">02</span><span data-i18n>Comparar</span></button>
-      <button class="tab" role="tab" data-route="corpus"><span class="num">03</span><span data-i18n>Corpus</span></button>
-      <button class="tab" role="tab" data-route="map"><span class="num">04</span><span data-i18n>Mapa semántico</span></button>
-      <button class="tab" role="tab" data-route="eval"><span class="num">05</span><span data-i18n>Evaluación</span></button>
-      <button class="tab" role="tab" data-route="guide"><span class="num">06</span><span data-i18n>Cómo funciona</span></button>
-      <button class="tab" role="tab" data-route="learn"><span class="num">07</span><span data-i18n>Arquitecturas</span></button>
+    <nav class="tabs" data-i18n-label="Secciones" aria-label="Secciones">
+      <button class="tab" data-route="ask"><span class="num" aria-hidden="true">01</span><span data-i18n>Preguntar</span></button>
+      <button class="tab" data-route="compare"><span class="num" aria-hidden="true">02</span><span data-i18n>Comparar</span></button>
+      <button class="tab" data-route="corpus"><span class="num" aria-hidden="true">03</span><span data-i18n>Corpus</span></button>
+      <button class="tab" data-route="map"><span class="num" aria-hidden="true">04</span><span data-i18n>Mapa semántico</span></button>
+      <button class="tab" data-route="eval"><span class="num" aria-hidden="true">05</span><span data-i18n>Evaluación</span></button>
+      <button class="tab" data-route="guide"><span class="num" aria-hidden="true">06</span><span data-i18n>Cómo funciona</span></button>
+      <button class="tab" data-route="learn"><span class="num" aria-hidden="true">07</span><span data-i18n>Arquitecturas</span></button>
     </nav>
     <div class="nav-right">
-      <button class="pill-status" id="llm-pill" title="Conexión con el LLM"><span class="dot"></span><span>LLM</span></button>
+      <button class="pill-status" id="llm-pill" aria-haspopup="dialog"><span class="dot"></span><span>LLM</span></button>
       <button class="icon-btn" id="theme-btn" data-i18n-label="Cambiar tema" aria-label="Cambiar tema">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       </button>
     </div>
   </header>
 
-  <main id="app"></main>
+  <main id="app" tabindex="-1"></main>
 
   <footer class="footer">
     <div class="footer-inner">
@@ -61,7 +62,7 @@
     </div>
   </footer>
 
-  <div class="loader" id="loader">
+  <div class="loader" id="loader" role="status" aria-live="polite">
     <div class="loader-card">
       <img class="logo-light" src="/static/img/valgrai-logo.svg" alt="ValgrAI" style="height:44px;margin:0 auto;display:block"><img class="logo-dark" src="/static/img/valgrai-logo-dark.svg" alt="ValgrAI" style="height:44px;margin:0 auto">
       <h2 data-i18n>Preparando el laboratorio</h2>

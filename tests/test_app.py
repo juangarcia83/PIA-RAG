@@ -1,10 +1,14 @@
-"""Servidor: configuración, clave del LLM, instrumentación y vista incrustable."""
+"""Servidor: configuración, clave del LLM, instrumentación, conversación y vista incrustable."""
 import os
+from types import SimpleNamespace
 
 import dogvrag as dr
 from app import config, embed_bundle
+from app.engine import Engine
 from app.instrumentation import Recorder, instrument, overrides
 from dogvrag.generation import NullGenerator
+
+from .conftest import ScriptedLLM
 
 
 def test_settings_env_override_and_relative_paths(monkeypatch, tmp_path):
@@ -57,3 +61,21 @@ def test_answer_language_is_not_tunable(index):
     pipe = dr.AdvancedRAG(index, NullGenerator(), reranker=None)
     with overrides(pipe, {"answer_lang": "es", "top_k": 3}):
         assert pipe.answer_lang == "va" and pipe.top_k == 3
+
+
+def test_follow_up_is_rewritten_with_the_conversation():
+    llm = ScriptedLLM(["«Quin termini hi ha per a la plaça de lampista d'Alaquàs?»\n"])
+    eng = SimpleNamespace(generator=llm, s=config.Settings())
+    history = [{"question": "Quina plaça convoca Alaquàs?", "answer": "Una plaça d'oficial de lampista [1]."}]
+    out = Engine.standalone_question(eng, "I quin termini hi ha?", history)
+    assert out == "Quin termini hi ha per a la plaça de lampista d'Alaquàs?"
+    prompt = llm.calls[0][0]["content"]
+    assert "Usuari: Quina plaça convoca Alaquàs?" in prompt and "Última pregunta: I quin termini hi ha?" in prompt
+
+
+def test_without_history_or_llm_the_question_is_kept():
+    eng = SimpleNamespace(generator=NullGenerator(), s=config.Settings())
+    assert Engine.standalone_question(eng, "I quin termini?", [{"question": "a", "answer": "b"}]) == "I quin termini?"
+    llm = ScriptedLLM([])
+    assert Engine.standalone_question(SimpleNamespace(generator=llm, s=config.Settings()), "Pregunta", []) == "Pregunta"
+    assert not llm.calls

@@ -159,7 +159,7 @@ export class PipelineGraph {
   }
 
   particle(path) {
-    if (this.quiet) return;
+    if (this.quiet || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const len = path.getTotalLength();
     const dot = s("circle", { class: "particle", r: 4 });
     this.fxG.append(dot);

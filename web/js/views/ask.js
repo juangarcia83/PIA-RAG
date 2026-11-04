@@ -25,6 +25,8 @@ const TIMING_COLORS = { retrieval: "var(--c-naive)", rerank: "var(--c-advanced)"
   second_pass: "#8e6bd8", planning: "var(--c-agentic)", generation: "var(--c-corrective)" };
 const TIMING_LABELS = { retrieval: "Retrieval", rerank: "Reranking", query_rewriting: "Reformulación", second_pass: "2ª pasada", planning: "Planificación (agente)", generation: "Generación" };
 const VERDICTS = { correct: "correcto", ambiguous: "ambiguo", incorrect: "abstención" };
+const CHAT_TURNS = 20;     // turnos de conversación guardados en el navegador
+const CHAT_HISTORY = 4;    // turnos anteriores que se envían con cada pregunta
 
 // ------------------------------------------------------------------ piezas reutilizables
 export function timingBar(timings) {
@@ -50,7 +52,7 @@ export function sourceCard(c, color, { compact = false, chunker = "advanced" } =
       h("div", { style: { minWidth: 0, flex: 1 } },
         h("div", { class: "src-title", translate: "no" }, short(c.title || t("(sin título)"), compact ? 120 : 220)),
         h("div", { class: "src-meta" }, h("span", { class: "mono" }, c.code), h("span", {}, fmtDate(c.date)), h("span", {}, short(c.organismo, 48)),
-          c.rank ? h("span", {}, `rank #${c.rank}`) : null))),
+          c.rank && !compact ? h("span", {}, `rank #${c.rank}`) : null))),
     compact ? null : h("div", { class: "scorebars" }, scores.map(([k, v]) => [
       h("span", {}, { dense: t("Denso"), bm25: "BM25", rrf: "RRF", rerank: "Reranker" }[k]),
       h("div", { class: "bar" }, h("span", { style: { width: `${Math.min(100, (v / maxOf[k]) * 100)}%`, background: color } })),
@@ -76,6 +78,91 @@ function linkCitations(root, sourcesEl) {
   });
 }
 
+// ------------------------------------------------------------------ fuentes en ventana emergente (chat)
+// En el chat las fuentes no se listan al final: cada cita [n] abre su ficha al pasar el ratón, al pulsarla o con el
+// teclado. Una sola ventana para toda la página, que se queda abierta mientras el ratón está encima.
+let citePop = null, citeTimer = 0, citeAnchor = null;
+
+function citePopovers(root, contexts, chunker) {
+  const byN = Object.fromEntries(contexts.map((c) => [String(c.n), c]));
+  root.querySelectorAll(".cite").forEach((el) => {
+    const c = byN[el.dataset.n];
+    if (!c) return;
+    el.tabIndex = 0;
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", t("Fuente {n}: {title}", { n: c.n, title: short(c.title || "", 90) }));
+    el.setAttribute("aria-haspopup", "dialog");
+    el.setAttribute("aria-expanded", "false");
+    el.setAttribute("aria-controls", "cite-pop");
+    const open = () => showCite(el, c, chunker);
+    el.addEventListener("mouseenter", open);
+    el.addEventListener("click", (e) => { e.stopPropagation(); open(); });
+    el.addEventListener("mouseleave", hideCiteSoon);
+    // con el teclado, Intro o Espacio abren la ficha y llevan el foco a su primer botón
+    el.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      open();
+      citePop.querySelector("button, a")?.focus();
+    });
+  });
+}
+
+function showCite(anchor, c, chunker) {
+  clearTimeout(citeTimer);
+  if (!citePop) {
+    citePop = h("div", { class: "cite-pop", id: "cite-pop", role: "dialog" });
+    citePop.addEventListener("mouseenter", () => clearTimeout(citeTimer));
+    citePop.addEventListener("mouseleave", hideCiteSoon);
+    citePop.addEventListener("focusout", (e) => { if (!citePop.contains(e.relatedTarget) && e.relatedTarget !== citeAnchor) hideCiteSoon(); });
+    document.body.append(citePop);
+    addEventListener("scroll", () => { if (!citePop.contains(document.activeElement)) hideCite(); }, { passive: true });
+    addEventListener("hashchange", () => hideCite());
+    document.addEventListener("click", (e) => { if (!citePop.contains(e.target)) hideCite(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && citePop.classList.contains("show")) hideCite(true); });
+  }
+  if (citeAnchor !== anchor) citeAnchor?.setAttribute("aria-expanded", "false");
+  citeAnchor?.classList.remove("on");
+  citeAnchor = anchor;
+  anchor.classList.add("on");
+  anchor.setAttribute("aria-expanded", "true");
+  citePop.setAttribute("aria-label", t("Fuente {n}", { n: c.n }));
+  citePop.replaceChildren(
+    h("div", { class: "cite-pop-head" }, h("span", { class: "src-n", "aria-hidden": "true" }, c.n),
+      h("div", { class: "src-title", translate: "no" }, short(c.title || t("(sin título)"), 170))),
+    h("div", { class: "src-meta" }, h("span", { class: "mono" }, c.code), h("span", {}, fmtDate(c.date)), h("span", {}, short(c.organismo, 48))),
+    h("p", { class: "cite-pop-text", translate: "no", tabindex: 0 }, citeExcerpt(c)),
+    h("div", { class: "src-actions" },
+      h("button", { class: "btn ghost sm", onclick: () => { hideCite(); openDocAtText(c.doc, c.text, chunker); } }, t("Abrir disposición")),
+      c.url ? h("a", { class: "btn ghost sm", href: c.url, target: "_blank", rel: "noopener" }, "PDF ↗", h("span", { class: "sr-only" }, t("(se abre en otra pestaña)"))) : null));
+  citePop.classList.add("show");
+  // encima de la cita si cabe; si no, debajo
+  const r = anchor.getBoundingClientRect(), w = citePop.offsetWidth, ht = citePop.offsetHeight;
+  const top = r.top - ht - 10 > 76 ? r.top - ht - 10 : r.bottom + 10;
+  citePop.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+  citePop.style.top = `${top}px`;
+}
+
+/** Texto del fragmento sin encabezados Markdown ni el título (que ya está en la ficha). */
+function citeExcerpt(c) {
+  const title = (c.title || "").slice(0, 40);
+  const body = c.text.split("\n").map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#") && !(title && l.startsWith(title)) && !/^(Títol|Apartat|Título|Apartado):/.test(l));
+  return short(body.join(" ").replace(/\s+/g, " "), 320);
+}
+
+function hideCiteSoon() { clearTimeout(citeTimer); citeTimer = setTimeout(() => hideCite(), 220); }
+/** Cierra la ficha; con `refocus`, devuelve el foco a la cita (al cerrar con Esc desde dentro). */
+function hideCite(refocus = false) {
+  clearTimeout(citeTimer);
+  const back = refocus && citePop?.contains(document.activeElement) ? citeAnchor : null;
+  citePop?.classList.remove("show");
+  citeAnchor?.classList.remove("on");
+  citeAnchor?.setAttribute("aria-expanded", "false");
+  citeAnchor = null;
+  back?.focus();
+}
+
 // ------------------------------------------------------------------ vista
 export function askView(root, state, { restore = false } = {}) {
   const st = state.status;
@@ -93,25 +180,40 @@ export function askView(root, state, { restore = false } = {}) {
   ta.addEventListener("input", autosize);
   ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } });
   go.addEventListener("click", () => submit());
-  const searchBox = h("div", { class: "search-box" }, ta, go);
+  // modelo del modo simple, junto al botón de enviar: «Estándar» (Naive) o «Avanzado» (Advanced, por defecto)
+  let stdModel = store("stdModel") === "naive" ? "naive" : "advanced";
+  const modelPick = seg([["naive", t("Estándar")], ["advanced", t("Avanzado")]], stdModel, (v) => { stdModel = v; store("stdModel", v); });
+  modelPick.classList.add("model-pick", "std-only");
+  modelPick.setAttribute("aria-label", t("Modelo"));
+  const searchBox = h("div", { class: "search-box" }, ta, modelPick, go);
 
   const pipeSeg = seg(PIPE_ORDER.map((p) => [p, t(PIPES[p].label)]), pipeline, (v) => { pipeline = v; store("pipeline", v); options = {}; paintSettings(); paintPipeHint(); },
     { colors: Object.fromEntries(PIPE_ORDER.map((p) => [p, PIPES[p].color])) });
+  pipeSeg.setAttribute("aria-label", t("Arquitectura"));
   const genSwitch = h("input", { type: "checkbox", checked: generate && st.llm.available, disabled: !st.llm.available, onchange: (e) => { generate = e.target.checked; store("generate", generate); } });
   const filterBtn = h("button", { class: "btn secondary sm", onclick: () => togglePanel(filterPanel) }, icon("filter"), t("Filtros"));
   const settingsBtn = h("button", { class: "btn secondary sm", onclick: () => togglePanel(settingsPanel) }, icon("sliders"), t("Parámetros"));
-  const pipeHint = h("div", { class: "small muted", style: { maxWidth: "980px", margin: "10px auto 0", minHeight: "20px" } });
+  const pipeHint = h("div", { class: "small muted adv-only", style: { maxWidth: "980px", margin: "10px auto 0", minHeight: "20px" } });
   const paintPipeHint = () => { pipeHint.textContent = t(st.info[pipeline].summary); };
   paintPipeHint();
 
   const filterPanel = h("div", { class: "panel hidden adv-only" });
   const settingsPanel = h("div", { class: "panel hidden adv-only" });
 
-  // modo estándar (solo la pregunta y la arquitectura) o avanzado (generación, filtros y parámetros)
+  // modo simple (solo la pregunta y el modelo) o experto (arquitecturas, generación, filtros y parámetros)
   let mode = store("askMode") === "advanced" ? "advanced" : "standard";
-  const modeSeg = seg([["standard", t("Estándar")], ["advanced", t("Avanzado")]], mode, (v) => { mode = v; store("askMode", v); paintMode(); });
+  const modeSeg = seg([["standard", t("Simple")], ["advanced", t("Experto")]], mode, (v) => setMode(v));
+  /** Cambia de modo y, si ya hay una ejecución en pantalla, la vuelve a pintar con el formato del nuevo modo. */
+  const setMode = (v) => {
+    mode = v;
+    store("askMode", v);
+    modeSeg.set(v);
+    paintMode();
+    paintChat();
+    if (v === "advanced" && state.lastRun?.result) replayRun(state.lastRun);
+  };
   modeSeg.classList.add("mode-seg");
-  modeSeg.setAttribute("aria-label", t("Modo"));
+  modeSeg.setAttribute("aria-labelledby", "mode-label");
   const paintMode = () => {
     root.classList.toggle("mode-standard", mode === "standard");
     if (mode === "standard") [filterPanel, settingsPanel].forEach((x) => x.classList.add("hidden"));
@@ -195,7 +297,17 @@ export function askView(root, state, { restore = false } = {}) {
     h("span", { class: "tiny muted", style: { alignSelf: "center" } }, t("Recientes:")),
     history.slice(0, 5).map((q) => h("button", { class: "chip", onclick: () => { ta.value = q; autosize(); submit(); } }, short(q, 60)))) : null;
 
-  const results = h("div");
+  const results = h("div", { class: "adv-only" });   // panel completo de la última ejecución (modo experto)
+
+  // conversación del modo simple: se guarda en el navegador y cada pregunta se envía con los turnos anteriores
+  let chat = store("chat") || [];   // [{ question, pipeline, run_id, result }]
+  // el hilo es un registro: los lectores de pantalla anuncian cada respuesta nueva
+  const thread = h("div", { class: "chat-thread std-only", role: "log", "aria-live": "polite", "aria-label": t("Conversación") });
+  // barra fija sobre la conversación: cuántas preguntas lleva y empezar otra (vuelve a la pantalla inicial)
+  const chatCount = h("span", { class: "chat-bar-title" });
+  const chatBar = h("div", { class: "chat-bar chat-only" }, chatCount,
+    h("button", { class: "btn secondary sm", onclick: () => newChat() }, icon("plus"), t("Nueva conversación")));
+
   // la constelación usa la proyección real del índice avanzado
   const artCanvas = h("canvas", { "aria-hidden": "true" });
   const artCaption = h("figcaption", {}, t("cargando el espacio semántico…"));
@@ -206,35 +318,107 @@ export function askView(root, state, { restore = false } = {}) {
     constellation = new Constellation(artCanvas, d);
     artCaption.textContent = t("{n} fragmentos reales · consulta y 6 vecinos", { n: fmtNum(d.n) });
   }).catch(() => art.remove());
+  const heroEl = hero(1, "Preguntar", "Pregunta al *DOGV*",
+    t("Mira cómo cada arquitectura RAG busca, filtra y razona sobre las disposiciones del {from} al {to}.", {
+      from: fmtDate(st.corpus.dates[0]), to: fmtDate(st.corpus.dates[1]) }),
+    art);
+  // el modo se elige en la pantalla inicial: durante una conversación no se ve
+  heroEl.querySelector(".hero-text").append(h("div", { class: "mode-row" },
+    h("span", { class: "mode-label", id: "mode-label" }, t("Modo")), modeSeg,
+    h("span", { class: "mode-hint" }, t("Simple: chat con respuestas y fuentes · Experto: arquitecturas, filtros, parámetros y el proceso completo"))));
   root.append(
-    hero(1, "Preguntar", "Pregunta al *DOGV*",
-      t("Mira cómo cada arquitectura RAG busca, filtra y razona sobre las disposiciones del {from} al {to}.", {
-        from: fmtDate(st.corpus.dates[0]), to: fmtDate(st.corpus.dates[1]) }),
-      art),
-    h("div", { class: "search" }, searchBox),
-    h("div", { class: "toolbar" }, pipeSeg,
-      h("div", { class: "adv-only" },
+    heroEl,
+    chatBar, thread,
+    // en una conversación, la caja de pregunta queda fija abajo, como en un chat
+    h("div", { class: "composer" },
+      h("div", { class: "search" }, searchBox),
+      h("div", { class: "toolbar adv-only" }, pipeSeg,
         h("label", { class: "switch", title: st.llm.available ? "" : t("Conecta un LLM desde el botón de la barra superior") }, genSwitch, st.llm.available ? t("Generar respuesta") : t("Sin LLM · solo retrieval")),
         filterBtn, settingsBtn),
-      modeSeg),
-    pipeHint, filterPanel, settingsPanel, suggest, recent, results,
+      pipeHint, filterPanel, settingsPanel),
+    suggest, recent, results,
   );
+  chat.forEach((turn) => renderStoredTurn(turn));
+  paintChat();
   if (!restore) setTimeout(() => ta.focus(), 50);
+
+  // ---------- conversación (modo simple)
+  function paintChat() {
+    const chatting = mode === "standard" && thread.childElementCount > 0;
+    root.classList.toggle("chatting", chatting);
+    const n = thread.childElementCount;
+    chatCount.textContent = n === 1 ? t("Conversación · 1 pregunta") : t("Conversación · {n} preguntas", { n });
+    ta.placeholder = chatting ? t("Haz otra pregunta…") : t("Pregunta lo que quieras sobre el DOGV…");
+  }
+  function addTurn(question) {
+    const body = h("div");
+    const turn = h("div", { class: "chat-turn" },
+      h("div", { class: "chat-q" }, h("span", { class: "sr-only" }, t("Tu pregunta:"), " "), question), body);
+    thread.append(turn);
+    paintChat();
+    return { turn, body };
+  }
+  function renderStoredTurn(turn) {
+    const { body } = addTurn(turn.question);
+    const run = new RunPanel(body, turn.pipeline, st, turn.question, { simple: true, scroll: false, onExpand: () => expandStored(turn) });
+    run.graph.quiet = true;
+    run.onEvent(turn.result);
+  }
+  // los turnos guardados no tienen los eventos: se piden al servidor, que conserva las ejecuciones recientes
+  async function expandStored(turn) {
+    try {
+      const rec = await getJSON(`/api/runs/${encodeURIComponent(turn.run_id)}`);
+      expand({ pipeline: rec.pipeline, question: rec.question, events: rec.events, result: rec.events.find((e) => e.type === "result") });
+    } catch { toast(t("Esta ejecución ya no está en el servidor (se ha reiniciado).")); }
+  }
+  function newChat() {
+    controller?.abort();
+    chat = [];
+    store("chat", chat);
+    thread.replaceChildren();
+    paintChat();
+    ta.focus();
+  }
+  async function askChat(q) {
+    const pipe = stdModel;
+    // historial: la pregunta tal como la entendió el servidor y el principio de la respuesta
+    const history = chat.slice(-CHAT_HISTORY).map((x) => ({ question: x.result.question || x.question, answer: short(x.result.answer || "", 1200) }));
+    ta.value = "";
+    autosize();
+    const { turn, body } = addTurn(q);
+    turn.scrollIntoView({ behavior: "smooth", block: "start" });
+    const run = new RunPanel(body, pipe, st, q, { simple: true, scroll: false, onExpand: () => expand(run.snapshot()) });
+    searchBox.classList.add("busy");
+    try {
+      await streamRun({ question: q, pipeline: pipe, history, generate: st.llm.available }, (ev) => run.onEvent(ev), controller.signal);
+      const snap = run.snapshot();
+      state.lastRun = snap;
+      if (snap.result) {
+        const runId = snap.events.find((e) => e.type === "start")?.run_id;
+        chat = [...chat, { question: q, pipeline: pipe, run_id: runId, result: { ...snap.result, messages: null } }].slice(-CHAT_TURNS);
+        store("chat", chat);
+      }
+    } catch (e) {
+      if (e.name !== "AbortError") { toast(e.message); run.onEvent({ type: "error", message: e.message }); }
+    } finally { go.disabled = !ta.value.trim(); searchBox.classList.remove("busy"); }
+  }
 
   // ---------- ejecución
   async function submit(q = ta.value.trim()) {
     if (!q) return;
+    // en el chat no se interrumpe la respuesta en curso: la siguiente pregunta espera
+    if (mode === "standard" && searchBox.classList.contains("busy")) return;
     controller?.abort();
     controller = new AbortController();
     store("history", [q, ...(store("history") || []).filter((x) => x !== q)].slice(0, 8));
-    const run = new RunPanel(results, pipeline, st, q);
     go.disabled = true;
+    // en modo simple se pregunta con el modelo elegido y la configuración por defecto, dentro de la conversación
+    if (mode === "standard") return askChat(q);
+    const run = new RunPanel(results, pipeline, st, q);
     searchBox.classList.add("busy");
     try {
-      // en modo estándar se pregunta con la configuración por defecto: sin filtros ni parámetros y con respuesta
-      const adv = mode === "advanced";
-      await streamRun({ question: q, pipeline, filters: adv ? filters : {}, options: adv ? options : {},
-        generate: (adv ? generate : true) && st.llm.available }, (ev) => run.onEvent(ev), controller.signal);
+      await streamRun({ question: q, pipeline, filters, options, generate: generate && st.llm.available },
+        (ev) => run.onEvent(ev), controller.signal);
       state.lastRun = run.snapshot();
     } catch (e) {
       if (e.name !== "AbortError") { toast(e.message); run.onEvent({ type: "error", message: e.message }); }
@@ -249,10 +433,23 @@ export function askView(root, state, { restore = false } = {}) {
     lr.events.forEach((ev) => run.onEvent(ev));
     run.graph.quiet = false;
   };
+  // «Ver cómo se ha encontrado»: pasa a modo experto con la misma ejecución y su arquitectura seleccionada
+  function expand(lr) {
+    state.lastRun = lr;
+    pipeline = lr.pipeline;
+    store("pipeline", pipeline);
+    pipeSeg.set(pipeline);
+    options = {};
+    paintSettings();
+    paintPipeHint();
+    setMode("advanced");
+    results.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   const runId = new URLSearchParams(location.hash.split("?")[1] || "").get("run");
   if (runId) {
     getJSON(`/api/runs/${encodeURIComponent(runId)}`).then((rec) => {
       state.lastRun = { pipeline: rec.pipeline, question: rec.question, events: rec.events, result: rec.events.find((e) => e.type === "result") };
+      if (mode === "standard") setMode("advanced");   // el enlace abre el proceso completo
       replayRun(state.lastRun, true);
     }).catch((e) => toast(e.message));
   } else if (restore && state.lastRun?.result) {
@@ -264,8 +461,9 @@ export function askView(root, state, { restore = false } = {}) {
 
 // ------------------------------------------------------------------ panel de una ejecución
 class RunPanel {
-  constructor(container, pipeline, st, question, { scroll = true } = {}) {
+  constructor(container, pipeline, st, question, { scroll = true, simple = false, onExpand = null } = {}) {
     this.p = pipeline;
+    this.simple = simple;
     this.st = st;
     this.q = question;
     this.color = PIPES[pipeline].color;
@@ -309,14 +507,28 @@ class RunPanel {
       h("p", { class: "small muted", style: { marginTop: 0 } }, t("Top 12 de cada etapa. Las líneas unen el mismo chunk; en color, los que acaban en el contexto. Una línea discontinua desde abajo indica que venía de fuera del top 12.")),
       this.flowBox));
 
-    container.replaceChildren(
-      h("div", { class: "section-title" }, h("h2", {}, t("Ejecución")), h("span", { class: "small muted" }, t("Eventos reales del servidor, en directo"))),
-      pipeCard,
-      h("div", { class: "split", style: { marginTop: "16px" } }, answerCard, sourcesCard),
-      h("div", { style: { marginTop: "16px" } }, analysis),
-    );
+    if (simple) {
+      // modo simple (la respuesta de un turno del chat): el texto con sus citas, que abren cada fuente al pasar el
+      // ratón, y una línea discreta debajo; el proceso completo se ve al pasar a modo experto
+      this.statusEl = h("div", { class: "simple-status", role: "status" }, h("span", { class: "typing", "aria-hidden": "true" }, h("i"), h("i"), h("i")), t("Buscando en el DOGV…"));
+      this.noteEl = h("div", { class: "simple-note hidden" });
+      this.answerBody.replaceChildren();
+      this.metaEl = h("div", { class: "chat-meta hidden" });
+      this.onExpand = onExpand;
+      const msg = h("div", { class: "chat-a" }, h("div", { class: "chat-mark", "aria-hidden": "true" }, "§"),
+        h("div", { class: "chat-a-body" }, h("h3", { class: "sr-only" }, t("Respuesta")), this.statusEl, this.noteEl, this.answerBody, this.metaEl));
+      container.replaceChildren(msg);
+      if (scroll) msg.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      container.replaceChildren(
+        h("div", { class: "section-title" }, h("h2", {}, t("Ejecución")), h("span", { class: "small muted" }, t("Eventos reales del servidor, en directo"))),
+        pipeCard,
+        h("div", { class: "split", style: { marginTop: "16px" } }, answerCard, sourcesCard),
+        h("div", { style: { marginTop: "16px" } }, analysis),
+      );
+      if (scroll) pipeCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     this.select("flow");
-    if (scroll) pipeCard.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   addTab(key, label, render) {
@@ -371,6 +583,7 @@ class RunPanel {
       }
       case "result": this.onResult(ev); break;
       case "error":
+        this.statusEl?.remove();
         this.answerBody.replaceChildren(h("div", { class: "abstain" }, icon("alert"), h("div", {}, h("b", {}, "Error"), h("div", { class: "small" }, ev.message))));
         this.kpiEl.textContent = t("error");
         break;
@@ -379,6 +592,12 @@ class RunPanel {
 
   onResult(ev) {
     this.result = ev;
+    this.statusEl?.remove();
+    // pregunta de seguimiento reescrita por el servidor con la conversación
+    if (this.noteEl && ev.question && ev.question !== this.q) {
+      this.noteEl.replaceChildren(icon("pen"), h("span", {}, t("Pregunta interpretada:"), " ", h("i", {}, `«${ev.question}»`)));
+      this.noteEl.classList.remove("hidden");
+    }
     this.ctx.nContexts = ev.contexts.length;
     const byRank = [...ev.contexts].sort((a, b) => a.rank - b.rank);
     this.flow.setStage("ctx", byRank.map((c) => ({ id: c.chunk_ids[0], s: c.score, n: c.n })), t("top-{n} · [n] en el prompt", { n: ev.contexts.length }));
@@ -395,7 +614,8 @@ class RunPanel {
     } else {
       this.answerBody.innerHTML = renderAnswer(ev.answer);
       stagger(this.answerBody);
-      linkCitations(this.answerBody, this.sourcesEl);
+      if (this.simple) citePopovers(this.answerBody, ev.contexts, this.cfg.contextual ? "advanced" : "naive");
+      else linkCitations(this.answerBody, this.sourcesEl);
       const btn = h("button", { class: "btn ghost sm", onclick: () => this.grounding(btn) }, icon("check"), t("Comprobar fundamentación"));
       this.groundBtn.replaceChildren(btn);
     }
@@ -413,9 +633,19 @@ class RunPanel {
         h("pre", { class: "code", translate: "no", html: ev.messages.map((m) => `<span class="role">${m.role.toUpperCase()}</span>\n${esc(m.content)}`).join("\n\n") })) : null,
     );
 
+    // chat: número de fuentes, modelo y enlace al proceso, en una sola línea bajo la respuesta
+    if (this.simple) {
+      const model = this.p === "naive" ? t("Estándar") : t("Avanzado");
+      this.metaEl.replaceChildren(
+        h("span", {}, ev.contexts.length === 1 ? t("1 fuente") : t("{n} fuentes", { n: ev.contexts.length })),
+        h("span", {}, model),
+        this.onExpand ? h("button", { class: "linkish", onclick: this.onExpand }, t("Ver cómo se ha encontrado")) : null);
+      this.metaEl.classList.remove("hidden");
+    }
+
     // fuentes
     const chunker = this.cfg.contextual ? "advanced" : "naive";
-    this.sourcesEl.replaceChildren(...(ev.contexts.length ? ev.contexts.map((c) => sourceCard(c, this.color, { chunker }))
+    this.sourcesEl.replaceChildren(...(ev.contexts.length ? ev.contexts.map((c) => sourceCard(c, this.color, { chunker, compact: this.simple }))
       : [h("div", { class: "empty small" }, t("Ningún fragmento supera los filtros."))]));
     stagger(this.sourcesEl, 60);
 

@@ -63,6 +63,7 @@ export function icon(name, cls = "icon") {
     up: "M12 19V5M6 11l6-6 6 6",
     play: "M7 5l12 7-12 7z",
     pause: "M8 5v14M16 5v14",
+    plus: "M12 5v14M5 12h14",
     replay: "M4 4v6h6M20 12a8 8 0 1 1-2.3-5.7L20 9",
     prev: "M15 6l-6 6 6 6",
     next: "M9 6l6 6-6 6",
@@ -152,19 +153,38 @@ export function toast(msg, ms = 2600) {
 // ------------------------------------------------------------------ hoja lateral y modal
 export function openLayer(kind, content, { onClose } = {}) {
   const scrim = h("div", { class: "scrim" });
-  const layer = h("div", { class: kind, role: "dialog", "aria-modal": "true" }, content);
+  const layer = h("div", { class: kind, role: "dialog", "aria-modal": "true", tabindex: -1 }, content);
+  // el título del contenido da nombre al diálogo
+  const title = layer.querySelector("h1, h2, h3");
+  if (title) { title.id ||= `dlg-${Math.random().toString(36).slice(2, 8)}`; layer.setAttribute("aria-labelledby", title.id); }
+  const opener = document.activeElement;
   const close = () => {
     layer.classList.remove("show");
     scrim.classList.remove("show");
     document.removeEventListener("keydown", onKey);
     setTimeout(() => { layer.remove(); scrim.remove(); }, 350);
+    opener?.focus?.();   // el foco vuelve a lo que abrió el diálogo
     onClose && onClose();
   };
-  const onKey = (e) => { if (e.key === "Escape") close(); };
+  const focusables = () => [...layer.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter((el) => el.offsetParent !== null);
+  const onKey = (e) => {
+    if (e.key === "Escape") close();
+    if (e.key !== "Tab") return;
+    // el foco no sale del diálogo mientras está abierto
+    const els = focusables();
+    if (!els.length) { e.preventDefault(); layer.focus(); return; }
+    const first = els[0], last = els.at(-1);
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === layer)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
   scrim.addEventListener("click", close);
   document.addEventListener("keydown", onKey);
   document.body.append(scrim, layer);
-  requestAnimationFrame(() => { scrim.classList.add("show"); layer.classList.add("show"); });
+  requestAnimationFrame(() => {
+    scrim.classList.add("show"); layer.classList.add("show");
+    (focusables()[0] || layer).focus({ preventScroll: true });
+  });
   return { close, layer };
 }
 

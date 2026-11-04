@@ -16,10 +16,14 @@ export const state = { status: null, lastRun: null };
 const ROUTES = { ask: askView, compare: compareView, corpus: corpusView, map: mapView, eval: evalView, guide: guideView, learn: learnView };
 let current = null;
 
-function route({ keepScroll = false } = {}) {
+const TITLES = { ask: "Preguntar", compare: "Comparar", corpus: "Corpus", map: "Mapa semántico", eval: "Evaluación",
+  guide: "Cómo funciona", learn: "Arquitecturas" };
+
+function route({ keepScroll = false, focus = false } = {}) {
   const name = (location.hash.match(/^#\/(\w+)/) || [])[1] || "ask";
   const view = ROUTES[name] ? name : "ask";
-  $$(".tab").forEach((tab) => tab.setAttribute("aria-selected", tab.dataset.route === view));
+  $$(".tab").forEach((tab) => (tab.dataset.route === view ? tab.setAttribute("aria-current", "page") : tab.removeAttribute("aria-current")));
+  document.title = `${t(TITLES[view])} · RAG Lab · DOGV`;
   moveTabInk();
   if (current?.destroy) current.destroy();
   const y = scrollY;
@@ -29,10 +33,17 @@ function route({ keepScroll = false } = {}) {
   app.append(root);
   current = ROUTES[view](root, state, { restore: keepScroll }) || null;
   scrollTo({ top: keepScroll ? y : 0 });
+  // al cambiar de sección, el foco va al título para que el lector de pantalla anuncie la página nueva
+  if (focus) {
+    const h1 = root.querySelector("h1");
+    if (h1) { h1.tabIndex = -1; h1.focus({ preventScroll: true }); }
+  }
 }
 
 $$(".tab").forEach((tab) => tab.addEventListener("click", () => { location.hash = `#/${tab.dataset.route}`; }));
-addEventListener("hashchange", () => route());
+addEventListener("hashchange", () => route({ focus: true }));
+// «Saltar al contenido»: la app enruta por el hash, así que el enlace no puede cambiarlo
+$(".skip-link").addEventListener("click", (e) => { e.preventDefault(); $("#app").focus(); });
 
 // ------------------------------------------------------------------ textos fijos
 /** Textos fijos de index.html: cada elemento con data-i18n guarda su texto en castellano como clave. */
@@ -49,7 +60,11 @@ applyStaticTexts();
 // ------------------------------------------------------------------ tema
 const isDark = () => document.documentElement.dataset.theme === "dark" ||
   (!document.documentElement.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
-function applyThemeIcon() { $("#theme-btn").replaceChildren(icon(isDark() ? "sun" : "moon")); }
+function applyThemeIcon() {
+  const btn = $("#theme-btn");
+  btn.replaceChildren(icon(isDark() ? "sun" : "moon"));
+  btn.setAttribute("aria-label", isDark() ? t("Cambiar a tema claro") : t("Cambiar a tema oscuro"));
+}
 $("#theme-btn").addEventListener("click", () => {
   document.documentElement.dataset.theme = isDark() ? "light" : "dark";
   try { localStorage.setItem("raglab.theme", document.documentElement.dataset.theme); } catch {}
@@ -69,6 +84,7 @@ export function renderLLMPill() {
     h("span", {}, llm?.available ? short(llm.model || "LLM", 28) : t("Solo retrieval")),
   );
   pill.title = llm?.available ? t("Conectado: {name}", { name: llm.name }) : t("Sin LLM: {error}", { error: llm?.error || "" });
+  pill.setAttribute("aria-label", `${pill.title}. ${t("Configurar el modelo generativo")}`);
 }
 
 function llmDialog() {
