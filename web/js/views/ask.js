@@ -11,7 +11,7 @@ import { openDocAtText } from "./docsheet.js";
 import { describe } from "../narrate.js";
 import { stagger } from "../motion.js";
 
-/** Preguntas de ejemplo: cada una tiene respuesta en la muestra del DOGV (28/10/2026 – 03/11/2026). */
+/** Preguntas de ejemplo de Comparar: cada una tiene respuesta en la muestra del DOGV (28/10/2026 – 03/11/2026). */
 export const EXAMPLES = [
   "Quines festes han rebut la declaració d'interés turístic?",
   "Quina profunditat té el sondeig d'aigües subterrànies autoritzat a Figueroles?",
@@ -291,15 +291,9 @@ export function askView(root, state, { restore = false } = {}) {
   }
   paintSettings();
 
-  // sugerencias
+  // preguntas recientes, solo en modo experto (en el simple ya están en la conversación)
   const history = store("history") || [];
-  const suggest = h("div", { class: "chips suggest" },
-    EXAMPLES.map((q) => h("button", { class: "chip", onclick: () => { ta.value = q; autosize(); submit(); } }, q)),
-    h("button", { class: "chip", title: t("Usa el título de una disposición al azar como consulta"), onclick: async () => {
-      const [ex] = await getJSON(`/api/examples?n=1&seed=${Date.now() % 100000}`);
-      ta.value = ex.title; autosize(); ta.focus();
-    } }, icon("dice"), t("Título al azar")));
-  const recent = history.length ? h("div", { class: "chips suggest", style: { marginTop: "8px" } },
+  const recent = history.length ? h("div", { class: "chips suggest adv-only", style: { marginTop: "14px" } },
     h("span", { class: "tiny muted", style: { alignSelf: "center" } }, t("Recientes:")),
     history.slice(0, 5).map((q) => h("button", { class: "chip", onclick: () => { ta.value = q; autosize(); submit(); } }, short(q, 60)))) : null;
 
@@ -342,7 +336,7 @@ export function askView(root, state, { restore = false } = {}) {
         h("label", { class: "switch", title: st.llm.available ? "" : t("Conecta un LLM desde el botón de la barra superior") }, genSwitch, st.llm.available ? t("Generar respuesta") : t("Sin LLM · solo retrieval")),
         filterBtn, settingsBtn),
       pipeHint, filterPanel, settingsPanel),
-    suggest, recent, results,
+    recent, results,
   );
   chat.forEach((turn) => renderStoredTurn(turn));
   paintChat();
