@@ -303,10 +303,20 @@ export function askView(root, state, { restore = false } = {}) {
   let chat = store("chat") || [];   // [{ question, pipeline, run_id, result }]
   // el hilo es un registro: los lectores de pantalla anuncian cada respuesta nueva
   const thread = h("div", { class: "chat-thread std-only", role: "log", "aria-live": "polite", "aria-label": t("Conversación") });
-  // barra fija sobre la conversación: cuántas preguntas lleva y empezar otra (vuelve a la pantalla inicial)
+  // una conversación es una «sesión» a pantalla completa (sin menú, modo ni pie); «Inicio» la cierra sin borrarla
+  let sessionOpen = store("chatOpen") ?? true;
+  // barra fija de la sesión: volver al inicio, cuántas preguntas lleva y empezar otra
   const chatCount = h("span", { class: "chat-bar-title" });
-  const chatBar = h("div", { class: "chat-bar chat-only" }, chatCount,
-    h("button", { class: "btn secondary sm", onclick: () => newChat() }, icon("plus"), t("Nueva conversación")));
+  const chatBar = h("div", { class: "chat-bar chat-only" },
+    h("button", { class: "btn ghost sm", onclick: () => closeSession() }, icon("prev"), t("Inicio")),
+    chatCount,
+    h("button", { class: "btn secondary sm", onclick: () => newChat() }, icon("plus"), h("span", { class: "label" }, t("Nueva conversación"))));
+  // en la pantalla inicial, si hay una conversación guardada, se ofrece retomarla
+  const resumeCount = h("span");
+  const resumeBar = h("div", { class: "resume-bar", role: "region", "aria-label": t("Conversación guardada") },
+    icon("chat"), resumeCount,
+    h("button", { class: "btn secondary sm", onclick: () => openSession() }, t("Retomarla")),
+    h("button", { class: "btn ghost sm", onclick: () => newChat() }, t("Nueva conversación")));
 
   // la constelación usa la proyección real del índice avanzado
   const artCanvas = h("canvas", { "aria-hidden": "true" });
@@ -332,6 +342,7 @@ export function askView(root, state, { restore = false } = {}) {
     // en una conversación, la caja de pregunta queda fija abajo, como en un chat
     h("div", { class: "composer" },
       h("div", { class: "search" }, searchBox),
+      resumeBar,
       h("div", { class: "toolbar adv-only" }, pipeSeg,
         h("label", { class: "switch", title: st.llm.available ? "" : t("Conecta un LLM desde el botón de la barra superior") }, genSwitch, st.llm.available ? t("Generar respuesta") : t("Sin LLM · solo retrieval")),
         filterBtn, settingsBtn),
@@ -344,11 +355,31 @@ export function askView(root, state, { restore = false } = {}) {
 
   // ---------- conversación (modo simple)
   function paintChat() {
-    const chatting = mode === "standard" && thread.childElementCount > 0;
-    root.classList.toggle("chatting", chatting);
     const n = thread.childElementCount;
+    const chatting = mode === "standard" && n > 0 && sessionOpen;
+    root.classList.toggle("chatting", chatting);
+    // en sesión se ocultan el menú de secciones y el pie de toda la página
+    document.body.classList.toggle("chat-session", chatting);
     chatCount.textContent = n === 1 ? t("Conversación · 1 pregunta") : t("Conversación · {n} preguntas", { n });
+    resumeCount.textContent = n === 1 ? t("Tienes una conversación con 1 pregunta") : t("Tienes una conversación con {n} preguntas", { n });
+    resumeBar.classList.toggle("hidden", !(mode === "standard" && n > 0 && !sessionOpen));
     ta.placeholder = chatting ? t("Haz otra pregunta…") : t("Pregunta lo que quieras sobre el DOGV…");
+  }
+  function setSession(open) {
+    sessionOpen = open;
+    store("chatOpen", open);
+    paintChat();
+  }
+  function openSession() {
+    setSession(true);
+    thread.lastElementChild?.scrollIntoView({ block: "start" });
+    ta.focus();
+  }
+  // «Inicio»: vuelve a la pantalla inicial; la conversación queda guardada para retomarla
+  function closeSession() {
+    setSession(false);
+    scrollTo({ top: 0 });
+    ta.focus();
   }
   function addTurn(question) {
     const body = h("div");
@@ -376,7 +407,8 @@ export function askView(root, state, { restore = false } = {}) {
     chat = [];
     store("chat", chat);
     thread.replaceChildren();
-    paintChat();
+    setSession(true);   // la siguiente pregunta abre una sesión nueva
+    scrollTo({ top: 0 });
     ta.focus();
   }
   async function askChat(q) {
@@ -385,6 +417,8 @@ export function askView(root, state, { restore = false } = {}) {
     const history = chat.slice(-CHAT_HISTORY).map((x) => ({ question: x.result.question || x.question, answer: short(x.result.answer || "", 1200) }));
     ta.value = "";
     autosize();
+    // preguntar desde la pantalla inicial continúa la conversación guardada (no la pierde) y abre la sesión
+    if (!sessionOpen) setSession(true);
     const { turn, body } = addTurn(q);
     turn.scrollIntoView({ behavior: "smooth", block: "start" });
     const run = new RunPanel(body, pipe, st, q, { simple: true, scroll: false, onExpand: () => expand(run.snapshot()) });
@@ -456,7 +490,7 @@ export function askView(root, state, { restore = false } = {}) {
     replayRun(state.lastRun);
   }
   if (state.pendingQuestion) { ta.value = state.pendingQuestion; state.pendingQuestion = null; autosize(); submit(); }
-  return { destroy: () => { controller?.abort(); constellation?.destroy(); } };
+  return { destroy: () => { controller?.abort(); constellation?.destroy(); document.body.classList.remove("chat-session"); } };
 }
 
 // ------------------------------------------------------------------ panel de una ejecución
