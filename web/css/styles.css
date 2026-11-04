@@ -195,6 +195,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand-mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--brand-grad); color: #fff; }
 .tabs { display: flex; gap: 2px; margin: 0 auto; overflow-x: auto; scrollbar-width: none; max-width: 100%; position: relative; }
 .tabs::-webkit-scrollbar { display: none; }
+.tabs.more-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.tabs.more-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+.tabs.more-l.more-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
 .tab { border: 0; background: transparent; padding: 0 12px; cursor: pointer; position: relative;
   font-size: 14px; font-weight: 500; color: var(--ink-2); white-space: nowrap; transition: color .2s; }
 .tab:hover { color: var(--ink); }
@@ -244,6 +248,11 @@ main { max-width: 1240px; width: 100%; margin: 0 auto; padding: 28px 20px 80px; 
 .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .split { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 980px) { .hero.with-art { grid-template-columns: minmax(0, 1fr); } .split, .g3, .g4 { grid-template-columns: minmax(0, 1fr); } .g2 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1280px) {
+  .tab .num, .brand .app span { display: none; }
+  .tab { padding: 0 9px; }
+  .nav { gap: 16px; }
+}
 @media (max-width: 720px) {
   .hero h1 { font-size: 34px; }
   .hero.with-art { grid-template-columns: minmax(0, 1fr); }
@@ -323,6 +332,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .panel { max-width: 980px; margin: 14px auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
   padding: 18px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); animation: fade .25s var(--ease); }
 .panel .note { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); margin: 0; }
+/* modo estándar / avanzado de Preguntar */
+.toolbar .adv-only { display: contents; }
+.mode-standard .adv-only { display: none !important; }
+.mode-seg { margin-left: auto; }
+.mode-seg button { padding: 6px 12px; font-size: 12.5px; }
+@media (max-width: 720px) { .mode-seg { margin-left: 0; } }
 
 /* ------------------------------------------------------------------ grafo del pipeline */
 .pipe-wrap { overflow-x: auto; margin: 0 -6px; padding: 4px 6px; }
@@ -532,6 +547,34 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .family p { color: var(--ink-2); margin: 0 0 10px; }
 .family ul { margin: 0; padding-left: 1.1em; color: var(--ink-2); font-size: 14px; }
 .family li { margin: 3px 0; }
+/* cómo funciona */
+.guide-query { max-width: 980px; margin: 0 auto 16px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
+  font: italic 500 18px/1.4 var(--font-display); color: var(--ink); }
+.guide { border-top: 3px solid var(--pc); }
+.guide-top { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between; }
+.guide-controls { display: flex; gap: 6px; align-items: center; }
+.guide-adds { color: var(--ink-2); margin: 14px 0 6px; font-size: 14.5px; }
+.guide-dots { display: flex; gap: 4px; margin: 12px 0 18px; }
+.guide-dots button { flex: 1; height: 6px; border: 0; padding: 0; border-radius: 99px; background: var(--sunken); cursor: pointer; transition: background .3s; }
+.guide-dots button.done { background: color-mix(in srgb, var(--pc) 55%, var(--sunken)); }
+.guide-dots button.active { background: var(--pc); }
+.guide-step { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px 32px; align-items: start; animation: fade .3s var(--ease); }
+.guide-step h3 { font: 560 24px/1.2 var(--font-display); letter-spacing: -0.015em; margin: 6px 0 8px; }
+.guide-step p { color: var(--ink-2); margin: 0; }
+.guide-io { display: grid; gap: 6px; }
+.guide-io-val { font: 13px/1.55 var(--mono); background: var(--sunken); border-radius: var(--r-sm); padding: 10px 12px; margin-top: 4px;
+  color: var(--ink); overflow-wrap: anywhere; border-left: 3px solid var(--pc); }
+.guide-arrow { color: var(--pc); font-size: 18px; line-height: 1; padding-left: 14px; }
+.guide-overview { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.guide-family { text-align: left; cursor: pointer; font: inherit; color: var(--ink-2); display: grid; gap: 6px; align-content: start;
+  border-top: 3px solid var(--pc); transition: transform .2s var(--ease), box-shadow .2s; }
+.guide-family b { color: var(--ink); font-size: 15px; }
+.guide-family .dot { width: 10px; height: 10px; }
+.guide-family span:last-child { font-size: 13px; }
+.guide-family:hover { transform: translateY(-2px); }
+.guide-family.active { box-shadow: 0 0 0 2px var(--pc), var(--shadow); }
+@media (max-width: 860px) { .guide-step { grid-template-columns: minmax(0, 1fr); } }
+
 .formula { font: 13px/1.6 var(--mono); background: var(--sunken); border-radius: var(--r-sm); padding: 10px 12px; color: var(--ink); overflow-wrap: anywhere; }
 .refs { font-size: 13px; color: var(--ink-2); padding-left: 1.1em; margin: 0; }
 .refs li { margin: 4px 0; }

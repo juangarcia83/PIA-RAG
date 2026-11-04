@@ -104,8 +104,19 @@ export function askView(root, state, { restore = false } = {}) {
   const paintPipeHint = () => { pipeHint.textContent = t(st.info[pipeline].summary); };
   paintPipeHint();
 
-  const filterPanel = h("div", { class: "panel hidden" });
-  const settingsPanel = h("div", { class: "panel hidden" });
+  const filterPanel = h("div", { class: "panel hidden adv-only" });
+  const settingsPanel = h("div", { class: "panel hidden adv-only" });
+
+  // modo estándar (solo la pregunta y la arquitectura) o avanzado (generación, filtros y parámetros)
+  let mode = store("askMode") === "advanced" ? "advanced" : "standard";
+  const modeSeg = seg([["standard", t("Estándar")], ["advanced", t("Avanzado")]], mode, (v) => { mode = v; store("askMode", v); paintMode(); });
+  modeSeg.classList.add("mode-seg");
+  modeSeg.setAttribute("aria-label", t("Modo"));
+  const paintMode = () => {
+    root.classList.toggle("mode-standard", mode === "standard");
+    if (mode === "standard") [filterPanel, settingsPanel].forEach((x) => x.classList.add("hidden"));
+  };
+  paintMode();
   const togglePanel = (p) => {
     const show = p.classList.contains("hidden");
     [filterPanel, settingsPanel].forEach((x) => x.classList.add("hidden"));
@@ -202,8 +213,10 @@ export function askView(root, state, { restore = false } = {}) {
       art),
     h("div", { class: "search" }, searchBox),
     h("div", { class: "toolbar" }, pipeSeg,
-      h("label", { class: "switch", title: st.llm.available ? "" : t("Conecta un LLM desde el botón de la barra superior") }, genSwitch, st.llm.available ? t("Generar respuesta") : t("Sin LLM · solo retrieval")),
-      filterBtn, settingsBtn),
+      h("div", { class: "adv-only" },
+        h("label", { class: "switch", title: st.llm.available ? "" : t("Conecta un LLM desde el botón de la barra superior") }, genSwitch, st.llm.available ? t("Generar respuesta") : t("Sin LLM · solo retrieval")),
+        filterBtn, settingsBtn),
+      modeSeg),
     pipeHint, filterPanel, settingsPanel, suggest, recent, results,
   );
   if (!restore) setTimeout(() => ta.focus(), 50);
@@ -218,7 +231,10 @@ export function askView(root, state, { restore = false } = {}) {
     go.disabled = true;
     searchBox.classList.add("busy");
     try {
-      await streamRun({ question: q, pipeline, filters, options, generate: generate && st.llm.available }, (ev) => run.onEvent(ev), controller.signal);
+      // en modo estándar se pregunta con la configuración por defecto: sin filtros ni parámetros y con respuesta
+      const adv = mode === "advanced";
+      await streamRun({ question: q, pipeline, filters: adv ? filters : {}, options: adv ? options : {},
+        generate: (adv ? generate : true) && st.llm.available }, (ev) => run.onEvent(ev), controller.signal);
       state.lastRun = run.snapshot();
     } catch (e) {
       if (e.name !== "AbortError") { toast(e.message); run.onEvent({ type: "error", message: e.message }); }

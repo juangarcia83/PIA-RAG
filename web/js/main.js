@@ -8,11 +8,12 @@ import { compareView } from "./views/compare.js";
 import { corpusView } from "./views/corpus.js";
 import { mapView } from "./views/map.js";
 import { evalView } from "./views/eval.js";
+import { guideView } from "./views/guide.js";
 import { learnView } from "./views/learn.js";
 
 export const state = { status: null, lastRun: null };
 
-const ROUTES = { ask: askView, compare: compareView, corpus: corpusView, map: mapView, eval: evalView, learn: learnView };
+const ROUTES = { ask: askView, compare: compareView, corpus: corpusView, map: mapView, eval: evalView, guide: guideView, learn: learnView };
 let current = null;
 
 function route({ keepScroll = false } = {}) {

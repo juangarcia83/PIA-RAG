@@ -62,10 +62,26 @@ export function moveTabInk() {
   const sel = tabs?.querySelector('.tab[aria-selected="true"]');
   if (!tabs || !sel) return;
   let ink = tabs.querySelector(".tab-ink");
-  if (!ink) { ink = document.createElement("span"); ink.className = "tab-ink"; tabs.append(ink); }
-  ink.style.width = `${sel.offsetWidth - 24}px`;
-  ink.style.transform = `translateX(${sel.offsetLeft + 12}px)`;
+  if (!ink) {
+    ink = document.createElement("span"); ink.className = "tab-ink"; tabs.append(ink);
+    new ResizeObserver(() => moveTabInk()).observe(tabs);   // la barra cambia de ancho al cargar fuentes y el estado del LLM
+  }
+  const pad = parseFloat(getComputedStyle(sel).paddingLeft) || 12;
+  ink.style.width = `${sel.offsetWidth - 2 * pad}px`;
+  ink.style.transform = `translateX(${sel.offsetLeft + pad}px)`;
+  // si la barra no cabe, desplaza las pestañas hasta que la activa se vea entera
+  const left = sel.offsetLeft, right = left + sel.offsetWidth;
+  if (left < tabs.scrollLeft) tabs.scrollLeft = left;
+  else if (right > tabs.scrollLeft + tabs.clientWidth) tabs.scrollLeft = right - tabs.clientWidth;
+  markTabOverflow(tabs);
 }
+
+/** Degradado en el borde por el que quedan pestañas ocultas. */
+function markTabOverflow(tabs) {
+  tabs.classList.toggle("more-l", tabs.scrollLeft > 2);
+  tabs.classList.toggle("more-r", tabs.scrollLeft + tabs.clientWidth < tabs.scrollWidth - 2);
+}
+document.querySelector(".tabs")?.addEventListener("scroll", (e) => markTabOverflow(e.currentTarget), { passive: true });
 addEventListener("resize", moveTabInk);
 document.fonts?.ready.then(moveTabInk);
 

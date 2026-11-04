@@ -90,7 +90,7 @@ const PROPOSALS = [
 
 export function learnView(root) {
   const graphs = [];
-  root.append(hero(6, "Arquitecturas", "Familias de *RAG*",
+  root.append(hero(7, "Arquitecturas", "Familias de *RAG*",
     t("Cinco arquitecturas, de la más simple a la más autónoma. Cada una añade una pieza y se puede medir qué aporta.")));
 
   for (const p of PIPE_ORDER) {

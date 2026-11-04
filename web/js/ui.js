@@ -62,6 +62,7 @@ export function icon(name, cls = "icon") {
     arrow: "M5 12h14M13 6l6 6-6 6",
     up: "M12 19V5M6 11l6-6 6 6",
     play: "M7 5l12 7-12 7z",
+    pause: "M8 5v14M16 5v14",
     replay: "M4 4v6h6M20 12a8 8 0 1 1-2.3-5.7L20 9",
     prev: "M15 6l-6 6 6 6",
     next: "M9 6l6 6-6 6",
