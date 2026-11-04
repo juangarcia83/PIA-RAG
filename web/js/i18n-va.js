@@ -104,6 +104,11 @@ export const VA = {
   "Sale": "Ix",
   "Pausa": "Pausa",
   "Reproducir": "Reprodueix",
+  "Cinco arquitecturas, de la más simple a la más autónoma. Elige una y sigue una pregunta real del DOGV etapa a etapa.":
+    "Cinc arquitectures, de la més simple a la més autònoma. Tria'n una i seguix una pregunta real del DOGV etapa a etapa.",
+  "Ficha técnica": "Fitxa tècnica",
+  "Recorrido animado": "Recorregut animat",
+  "Abrir referencia": "Obri la referència",
   "Chunks de tamaño fijo, retrieval denso top-k y generación.": "Chunks de grandària fixa, retrieval dens top-k i generació.",
   "Ablation: BM25 + denso con RRF sobre chunks estructurales, sin reranker.": "Ablation: BM25 + dens amb RRF sobre chunks estructurals, sense reranker.",
   "Híbrido BM25 + denso (RRF), reranking con cross-encoder y reordenación del contexto.": "Híbrid BM25 + dens (RRF), reranking amb cross-encoder i reordenació del context.",

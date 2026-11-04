@@ -9,18 +9,19 @@ import { corpusView } from "./views/corpus.js";
 import { mapView } from "./views/map.js";
 import { evalView } from "./views/eval.js";
 import { guideView } from "./views/guide.js";
-import { learnView } from "./views/learn.js";
 
 export const state = { status: null, lastRun: null };
 
-const ROUTES = { ask: askView, compare: compareView, corpus: corpusView, map: mapView, eval: evalView, guide: guideView, learn: learnView };
+const ROUTES = { ask: askView, compare: compareView, corpus: corpusView, map: mapView, eval: evalView, guide: guideView };
+const ALIASES = { learn: "guide" };   // la antigua sección Arquitecturas está ahora dentro de guide
 let current = null;
 
 const TITLES = { ask: "Preguntar", compare: "Comparar", corpus: "Corpus", map: "Mapa semántico", eval: "Evaluación",
-  guide: "Cómo funciona", learn: "Arquitecturas" };
+  guide: "Arquitecturas" };
 
 function route({ keepScroll = false, focus = false } = {}) {
-  const name = (location.hash.match(/^#\/(\w+)/) || [])[1] || "ask";
+  let name = (location.hash.match(/^#\/(\w+)/) || [])[1] || "ask";
+  name = ALIASES[name] || name;
   const view = ROUTES[name] ? name : "ask";
   $$(".tab").forEach((tab) => (tab.dataset.route === view ? tab.setAttribute("aria-current", "page") : tab.removeAttribute("aria-current")));
   document.title = `${t(TITLES[view])} · RAG Lab · DOGV`;

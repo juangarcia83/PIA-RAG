@@ -19,7 +19,8 @@ Así se añadió Agentic; sirve igual para GraphRAG, Self-RAG, Adaptive-RAG…
      se dibuja como vuelta por debajo del grafo.
    - `web/js/viz/flow.js` (`ORDER`), `web/js/views/compare.js` (`STEPS`), `web/js/narrate.js` (narración).
    - `web/js/views/ask.js`: parámetros (`SPEC`, `applies`) y pestañas propias.
-   - `web/js/views/learn.js`: ficha en `FAMILIES` y referencias en `REFS`.
+   - `web/js/views/guide.js` (sección Arquitecturas): etapas en `STAGES`, recorrido en `TOURS`, escalera en `ADDS`
+     y `FACTS`, ficha técnica en `FAMILIES` y referencias en `REFS`.
 5. **Traducciones**: cada texto nuevo de `t()` en `web/js/i18n-va.js`.
 6. **Pruebas**: un test en `tests/` con `HashingEmbedder` y, si usa el LLM, `ScriptedLLM` (ver `test_agentic.py`).
 7. **Open WebUI** (opcional): `PIPELINES` y `_status_text` en `integrations/openwebui/dogv_rag_pipe.py`, y

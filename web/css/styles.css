@@ -653,41 +653,85 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .mini-steps span.active { background: color-mix(in srgb, var(--pc) 45%, var(--sunken)); animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: .4; } }
 
-/* aprender */
-.family { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 32px; align-items: start; }
-.family > .family-graph { grid-column: 1 / -1; margin-top: 8px; }
-@media (max-width: 860px) { .family { grid-template-columns: minmax(0, 1fr); } }
-.family h3 { font: 560 24px/1.2 var(--font-display); letter-spacing: -0.015em; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.family p { color: var(--ink-2); margin: 0 0 10px; }
-.family ul { margin: 0; padding-left: 1.1em; color: var(--ink-2); font-size: 14px; }
-.family li { margin: 3px 0; }
-/* cómo funciona */
-.guide-query { max-width: 980px; margin: 0 auto 16px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline;
-  font: italic 500 18px/1.4 var(--font-display); color: var(--ink); }
-.guide { border-top: 3px solid var(--pc); }
-.guide-top { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between; }
+/* arquitecturas: escalera, recorrido animado, ficha técnica, conceptos y plegables */
+/* escalera de arquitecturas: de la más simple a la más autónoma, con flechas entre peldaños */
+.arch-ladder { position: relative; max-width: 1180px; margin: 0 auto 18px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; counter-reset: arch; }
+.arch-step { position: relative; display: grid; gap: 6px; align-content: start; text-align: left; font: inherit; color: var(--ink-2); cursor: pointer;
+  padding: 14px 14px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
+  transition: border-color .2s, box-shadow .2s, transform .2s var(--ease); }
+.arch-step::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--pc); opacity: .45; }
+.arch-step:not(:last-child)::after { content: "›"; position: absolute; right: -12px; top: 50%; transform: translateY(-50%); color: var(--muted);
+  font-size: 18px; line-height: 1; pointer-events: none; }
+.arch-step:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+.arch-step[aria-pressed="true"] { border-color: var(--pc); box-shadow: 0 0 0 1px var(--pc), var(--shadow); background: color-mix(in srgb, var(--pc) 7%, var(--surface)); }
+.arch-step[aria-pressed="true"]::before { opacity: 1; }
+.arch-num { font: 600 11px/1 var(--font-ui); letter-spacing: .06em; color: var(--muted); }
+.arch-name { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; color: var(--ink); }
+.arch-name .dot { width: 9px; height: 9px; }
+.arch-adds { font-size: 13px; line-height: 1.45; }
+.arch-facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.arch-facts b { color: var(--ink-2); font-weight: 600; }
+
+/* recorrido animado */
+.guide { max-width: 1180px; margin: 0 auto; border-top: 3px solid var(--pc); }
+.guide-top { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.guide-query { display: grid; gap: 4px; min-width: 0; }
+.guide-q { font: italic 500 18px/1.35 var(--font-display); color: var(--ink); }
 .guide-controls { display: flex; gap: 6px; align-items: center; }
-.guide-adds { color: var(--ink-2); margin: 14px 0 6px; font-size: 14.5px; }
-.guide-dots { display: flex; gap: 4px; margin: 12px 0 18px; }
+.guide-dots { display: flex; gap: 4px; margin: 14px 0 20px; }
 .guide-dots button { flex: 1; height: 6px; border: 0; padding: 0; border-radius: 99px; background: var(--sunken); cursor: pointer; transition: background .3s; }
 .guide-dots button.done { background: color-mix(in srgb, var(--pc) 55%, var(--sunken)); }
 .guide-dots button.active { background: var(--pc); }
-.guide-step { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px 32px; align-items: start; animation: fade .3s var(--ease); }
-.guide-step h3 { font: 560 24px/1.2 var(--font-display); letter-spacing: -0.015em; margin: 6px 0 8px; }
+.guide-step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 18px 36px; align-items: start; }
+.guide-step-text { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; animation: fade .3s var(--ease); }
+.guide-step-num { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--pc); color: #fff;
+  font: 600 19px/1 var(--font-display); }
+.guide-step h3 { font: 560 23px/1.2 var(--font-display); letter-spacing: -0.015em; margin: 4px 0 8px; }
 .guide-step p { color: var(--ink-2); margin: 0; }
-.guide-io { display: grid; gap: 6px; }
-.guide-io-val { font: 13px/1.55 var(--mono); background: var(--sunken); border-radius: var(--r-sm); padding: 10px 12px; margin-top: 4px;
-  color: var(--ink); overflow-wrap: anywhere; border-left: 3px solid var(--pc); }
-.guide-arrow { color: var(--pc); font-size: 18px; line-height: 1; padding-left: 14px; }
-.guide-overview { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-.guide-family { text-align: left; cursor: pointer; font: inherit; color: var(--ink-2); display: grid; gap: 6px; align-content: start;
-  border-top: 3px solid var(--pc); transition: transform .2s var(--ease), box-shadow .2s; }
-.guide-family b { color: var(--ink); font-size: 15px; }
-.guide-family .dot { width: 10px; height: 10px; }
-.guide-family span:last-child { font-size: 13px; }
-.guide-family:hover { transform: translateY(-2px); }
-.guide-family.active { box-shadow: 0 0 0 2px var(--pc), var(--shadow); }
-@media (max-width: 860px) { .guide-step { grid-template-columns: minmax(0, 1fr); } }
+.guide-io { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: stretch; }
+.guide-io-box { display: grid; gap: 6px; align-content: start; }
+.guide-io-val { font: 13px/1.55 var(--mono); background: var(--sunken); border-radius: var(--r-sm); padding: 10px 12px; color: var(--ink);
+  overflow-wrap: anywhere; border-top: 3px solid var(--pc); min-height: 64px; animation: fade .3s var(--ease); }
+.guide-arrow { color: var(--pc); font-size: 20px; line-height: 1; align-self: center; margin-top: 18px; }
+
+/* ficha técnica de la arquitectura elegida */
+.arch-sheet { max-width: 1180px; margin: 18px auto 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 36px;
+  border-left: 3px solid var(--pc); }
+.arch-sheet-head h3 { font: 560 24px/1.2 var(--font-display); letter-spacing: -0.015em; margin: 4px 0 8px; }
+.arch-sheet-head p { color: var(--ink-2); margin: 0; }
+.arch-points { margin: 0; padding-left: 1.1em; color: var(--ink-2); font-size: 14px; display: grid; gap: 6px; align-content: start; }
+.arch-sheet .formula { grid-column: 1 / -1; }
+
+/* conceptos clave y secciones plegables */
+.concepts { max-width: 1180px; margin: 0 auto; display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.concept { padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.concept h3 { font-size: 15px; font-weight: 650; margin: 0 0 6px; }
+.concept p { margin: 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.55; }
+.fold { max-width: 1180px; margin: 14px auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.fold summary { cursor: pointer; padding: 16px 18px; font-weight: 600; font-size: 15px; list-style: none; display: flex; align-items: center; gap: 10px; }
+.fold summary::-webkit-details-marker { display: none; }
+.fold summary::before { content: "›"; font-size: 20px; line-height: 1; color: var(--muted); transition: transform .2s; }
+.fold[open] summary::before { transform: rotate(90deg); }
+.fold > :not(summary) { padding: 0 18px 18px; }
+.props { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px; }
+.view:has(.arch-ladder) .section-title, .view:has(.arch-ladder) .hero { max-width: 1180px; margin-left: auto; margin-right: auto; }
+
+@media (max-width: 1080px) {
+  .arch-ladder { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); overflow-x: auto;
+    scroll-snap-type: x mandatory; padding-bottom: 6px; }
+  .arch-step { scroll-snap-align: start; }
+  .concepts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .guide-step, .arch-sheet, .props { grid-template-columns: minmax(0, 1fr); }
+  .concepts { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .guide-io { grid-template-columns: minmax(0, 1fr); }
+  .guide-arrow { transform: rotate(90deg); justify-self: start; margin: 0 0 0 14px; }
+  .guide-step-num { width: 36px; height: 36px; font-size: 16px; }
+  .guide-controls { width: 100%; justify-content: space-between; }
+}
 
 .formula { font: 13px/1.6 var(--mono); background: var(--sunken); border-radius: var(--r-sm); padding: 10px 12px; color: var(--ink); overflow-wrap: anywhere; }
 .refs { font-size: 13px; color: var(--ink-2); padding-left: 1.1em; margin: 0; }

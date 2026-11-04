@@ -81,7 +81,7 @@ mano). El servidor sirve `web/` en `/static/` con `Cache-Control: no-cache`.
 
 | Fichero | Papel |
 |---|---|
-| `js/main.js` | Enrutado por hash (`#/ask`, `#/compare`, `#/corpus`, `#/map`, `#/eval`, `#/learn`), tema, idioma, diálogo del LLM, sondeo de la carga. |
+| `js/main.js` | Enrutado por hash (`#/ask`, `#/compare`, `#/corpus`, `#/map`, `#/eval`, `#/guide`; `#/learn` redirige a `#/guide`), tema, diálogo del LLM, sondeo de la carga. |
 | `js/api.js` | `getJSON`, `postJSON`, `cached`, `streamRun` (lector NDJSON cancelable). |
 | `js/ui.js` | `h()`/`s()` (crear HTML/SVG), iconos, formatos, tooltip, toast, `renderAnswer`, `hero`, `seg`, `store`, **`PIPES`** y **`PIPE_ORDER`**. |
 | `js/i18n.js`, `js/i18n-va.js` | `t("texto en castellano", {vars})`; el diccionario valenciano usa el texto castellano como clave. |
