@@ -3,7 +3,8 @@
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ------------------------------------------------------------------ entradas al hacer scroll
-const REVEAL = ".card, .section-title, .hero-text > *, .hero-art, .search, .toolbar, .suggest";
+// la caja de pregunta no entra: tiene que verse siempre, también fija abajo en la sesión de chat
+const REVEAL = ".card, .section-title, .hero-text > *, .hero-art, .toolbar, .suggest";
 const seen = new WeakSet();
 const io = new IntersectionObserver((entries) => {
   for (const e of entries) {

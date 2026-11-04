@@ -410,7 +410,8 @@ body.chat-session main { padding-top: 0; padding-bottom: 0; }
 .chat-meta > span + span::before { content: "·"; margin-right: 14px; }
 .linkish { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
 .linkish:hover { text-decoration: underline; }
-.chatting .composer { position: sticky; bottom: 0; z-index: 5; max-width: 760px; margin: 14px auto 0; padding: 22px 0 14px;
+/* width: 100% porque en la sesión la vista es una columna flexible y, con márgenes automáticos, la caja se encogería */
+.chatting .composer { position: sticky; bottom: 0; z-index: 5; width: 100%; max-width: 760px; margin: 14px auto 0; padding: 22px 0 14px;
   background: linear-gradient(to bottom, transparent, var(--bg) 26px); }
 .chatting .composer .search { margin-top: 0; max-width: none; }
 .simple-status { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; min-height: 26px; }
