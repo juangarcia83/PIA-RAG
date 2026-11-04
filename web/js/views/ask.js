@@ -1,7 +1,7 @@
 // Preguntar: ejecuta una arquitectura en streaming y enseña cada etapa mientras ocurre.
 import { cached, getJSON, postJSON, streamRun } from "../api.js";
 import { h, hero, icon, seg, esc, fmtMs, fmtScore, fmtNum, fmtDate, short, bindTip, chunkTip, renderAnswer, toast, store, PIPES, PIPE_ORDER, sleep } from "../ui.js";
-import { t, getLang } from "../i18n.js";
+import { t } from "../i18n.js";
 import { PipelineGraph } from "../viz/pipeline.js";
 import { RankFlow } from "../viz/flow.js";
 import { scatter, barsH, legend, diverging } from "../viz/charts.js";
@@ -11,26 +11,15 @@ import { openDocAtText } from "./docsheet.js";
 import { describe } from "../narrate.js";
 import { stagger } from "../motion.js";
 
-const EXAMPLES = {
-  va: [
-    "Quines subvencions o ajudes es convoquen per als ajuntaments?",
-    "Quines places d'ocupació pública s'han convocat?",
-    "Com s'organitza la Conselleria d'Educació, Cultura i Universitats?",
-    "Quins criteris s'han fixat per als centres oncològics de referència?",
-    "Quines declaracions d'interés comunitari se sotmeten a informació pública?",
-    "Qui ha estat nomenat o cessat en algun càrrec?",
-  ],
-  es: [
-    "¿Qué subvenciones o ayudas se convocan para los ayuntamientos?",
-    "¿Qué plazas de empleo público se han convocado?",
-    "¿Cómo se organiza la Conselleria de Educación, Cultura y Universidades?",
-    "¿Qué criterios se han fijado para los centros oncológicos de referencia?",
-    "¿Qué declaraciones de interés comunitario se someten a información pública?",
-    "¿Quién ha sido nombrado o cesado en algún cargo?",
-  ],
-};
-/** Preguntas de ejemplo en el idioma de la interfaz (el índice es valenciano; las de castellano son cross-lingual). */
-export const examples = () => EXAMPLES[getLang()] || EXAMPLES.es;
+/** Preguntas de ejemplo: cada una tiene respuesta en la muestra del DOGV (28/10/2026 – 03/11/2026). */
+export const EXAMPLES = [
+  "Quines festes han rebut la declaració d'interés turístic?",
+  "Quina profunditat té el sondeig d'aigües subterrànies autoritzat a Figueroles?",
+  "Quantes places d'agent de la Policia Local convoca l'Ajuntament de Borriana?",
+  "Quines ajudes hi ha per a comprar vivenda en municipis de fins a 10.000 habitants?",
+  "Quines mesures establix el Decret llei 8/2026 per a respondre als danys de la dana?",
+  "Quin termini hi ha per a presentar instàncies a la plaça de lampista d'Alaquàs?",
+];
 
 const TIMING_COLORS = { retrieval: "var(--c-naive)", rerank: "var(--c-advanced)", query_rewriting: "var(--c-hybrid)",
   second_pass: "#8e6bd8", planning: "var(--c-agentic)", generation: "var(--c-corrective)" };
@@ -178,8 +167,6 @@ export function askView(root, state, { restore = false } = {}) {
       settingsPanel.append(h("label", { class: "switch" }, h("input", { type: "checkbox", checked: options[key] ?? cfg[key], onchange: (e) => { options[key] = e.target.checked; } }), t(label)));
     }
     settingsPanel.append(
-      h("div", { class: "field" }, h("label", {}, t("Idioma de la respuesta")),
-        seg([["va", t("Valenciano")], ["es", t("Castellano")]], options.answer_lang || getLang(), (v) => { options.answer_lang = v; })),
       h("p", { class: "note" }, t("Los cambios solo afectan a tus consultas desde esta página; no modifican la configuración del notebook."), " ",
         h("button", { class: "btn ghost sm", onclick: () => { options = {}; paintSettings(); toast(t("Parámetros restablecidos")); } }, t("Restablecer"))));
   }
@@ -188,7 +175,7 @@ export function askView(root, state, { restore = false } = {}) {
   // sugerencias
   const history = store("history") || [];
   const suggest = h("div", { class: "chips suggest" },
-    examples().map((q) => h("button", { class: "chip", onclick: () => { ta.value = q; autosize(); submit(); } }, q)),
+    EXAMPLES.map((q) => h("button", { class: "chip", onclick: () => { ta.value = q; autosize(); submit(); } }, q)),
     h("button", { class: "chip", title: t("Usa el título de una disposición al azar como consulta"), onclick: async () => {
       const [ex] = await getJSON(`/api/examples?n=1&seed=${Date.now() % 100000}`);
       ta.value = ex.title; autosize(); ta.focus();
@@ -210,8 +197,8 @@ export function askView(root, state, { restore = false } = {}) {
   }).catch(() => art.remove());
   root.append(
     hero(1, "Preguntar", "Pregunta al *DOGV*",
-      t("Mira cómo cada arquitectura RAG busca, filtra y razona sobre {n} disposiciones del {from} al {to}.", {
-        n: fmtNum(st.corpus.docs), from: fmtDate(st.corpus.dates[0]), to: fmtDate(st.corpus.dates[1]) }),
+      t("Mira cómo cada arquitectura RAG busca, filtra y razona sobre las disposiciones del {from} al {to}.", {
+        from: fmtDate(st.corpus.dates[0]), to: fmtDate(st.corpus.dates[1]) }),
       art),
     h("div", { class: "search" }, searchBox),
     h("div", { class: "toolbar" }, pipeSeg,
@@ -231,8 +218,7 @@ export function askView(root, state, { restore = false } = {}) {
     go.disabled = true;
     searchBox.classList.add("busy");
     try {
-      const opts = { ...options, answer_lang: options.answer_lang || getLang() };
-      await streamRun({ question: q, pipeline, filters, options: opts, generate: generate && st.llm.available }, (ev) => run.onEvent(ev), controller.signal);
+      await streamRun({ question: q, pipeline, filters, options, generate: generate && st.llm.available }, (ev) => run.onEvent(ev), controller.signal);
       state.lastRun = run.snapshot();
     } catch (e) {
       if (e.name !== "AbortError") { toast(e.message); run.onEvent({ type: "error", message: e.message }); }

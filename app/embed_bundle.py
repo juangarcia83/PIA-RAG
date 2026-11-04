@@ -60,11 +60,11 @@ def bundle(entry: str = ENTRY) -> str:
     return "\n".join(out)
 
 
-def page(run: dict, lang: str, base: str) -> str:
+def page(run: dict, base: str) -> str:
     """HTML completo de la vista de una ejecución, sin ninguna petición al RAG Lab."""
     html = (STATIC / "embed.html").read_text(encoding="utf-8")
     css = (STATIC / "css" / "styles.css").read_text(encoding="utf-8")
-    cfg = json.dumps({"run": run["id"], "lang": lang, "base": base, "data": run}, ensure_ascii=False, default=str)
+    cfg = json.dumps({"run": run["id"], "base": base, "data": run}, ensure_ascii=False, default=str)
     js = f"window.RAGLAB_EMBED = {cfg};\n{bundle()}"
     js = js.replace("</script", "<\\/script")          # nada dentro del script puede cerrarlo
     html = html.replace('<link rel="stylesheet" href="/static/css/styles.css">', f"<style>\n{css}\n</style>", 1)

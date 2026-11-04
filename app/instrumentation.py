@@ -29,7 +29,7 @@ Emit = Callable[[dict], None]
 # parámetros que se pueden ajustar por consulta desde la interfaz (atributo -> objeto que lo tiene)
 TUNABLE = {
     "top_k": "pipeline", "k_candidates": "pipeline", "window": "pipeline", "reorder": "pipeline",
-    "max_context_chars": "pipeline", "answer_lang": "pipeline", "tau_ok": "pipeline",
+    "max_context_chars": "pipeline", "tau_ok": "pipeline",
     "tau_abstain": "pipeline", "tau_context": "pipeline", "use_hyde": "pipeline", "n_rewrites": "pipeline",
     "max_steps": "pipeline",
     "dense_weight": "retriever", "sparse_weight": "retriever", "rrf_k": "retriever", "k_each": "retriever",

@@ -61,6 +61,7 @@ export const VA = {
   "Híbrido": "Híbrid",
   "Advanced": "Advanced",
   "Corrective": "Corrective",
+  "Agentic": "Agentic",
   "Chunks de tamaño fijo, retrieval denso top-k y generación.": "Chunks de grandària fixa, retrieval dens top-k i generació.",
   "Ablation: BM25 + denso con RRF sobre chunks estructurales, sin reranker.": "Ablation: BM25 + dens amb RRF sobre chunks estructurals, sense reranker.",
   "Híbrido BM25 + denso (RRF), reranking con cross-encoder y reordenación del contexto.": "Híbrid BM25 + dens (RRF), reranking amb cross-encoder i reordenació del context.",
@@ -140,7 +141,6 @@ export const VA = {
   "Reformulaciones": "Reformulacions",
   "Reordenar (lost in the middle)": "Reordena (lost in the middle)",
   "Usar HyDE": "Usa HyDE",
-  "Idioma de la respuesta": "Idioma de la resposta",
   "Valenciano": "Valencià",
   "Castellano": "Castellà",
   "Los cambios solo afectan a tus consultas desde esta página; no modifican la configuración del notebook.":
@@ -152,8 +152,8 @@ export const VA = {
   "Recientes:": "Recents:",
   "cargando el espacio semántico…": "carregant l'espai semàntic…",
   "{n} fragmentos reales · consulta y 6 vecinos": "{n} fragments reals · consulta i 6 veïns",
-  "Mira cómo cada arquitectura RAG busca, filtra y razona sobre {n} disposiciones del {from} al {to}.":
-    "Mira com cada arquitectura RAG busca, filtra i raona sobre {n} disposicions del {from} al {to}.",
+  "Mira cómo cada arquitectura RAG busca, filtra y razona sobre las disposiciones del {from} al {to}.":
+    "Mira com cada arquitectura RAG busca, filtra i raona sobre les disposicions del {from} al {to}.",
   "Conecta un LLM desde el botón de la barra superior": "Connecta un LLM des del botó de la barra superior",
   "Generar respuesta": "Genera la resposta",
   "Sin LLM · solo retrieval": "Sense LLM · només retrieval",

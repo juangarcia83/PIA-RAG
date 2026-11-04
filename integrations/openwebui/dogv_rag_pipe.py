@@ -20,69 +20,48 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field
 
-PIPELINES = {
-    "naive": {"es": "Naive", "va": "Naive"},
-    "hybrid": {"es": "Híbrido", "va": "Híbrid"},
-    "advanced": {"es": "Advanced", "va": "Advanced"},
-    "corrective": {"es": "Corrective", "va": "Corrective"},
-    "agentic": {"es": "Agentic", "va": "Agentic"},
-}
+PIPELINES = {"naive": "Naive", "hybrid": "Híbrid", "advanced": "Advanced", "corrective": "Corrective", "agentic": "Agentic"}
 
-# Marcas frecuentes del valenciano que no aparecen en castellano (para ANSWER_LANG = "auto").
-_VA_HINTS = re.compile(
-    r"\b(quins?|quines|què|perquè|també|amb|els|les|dels|per a|són|això|aquest|esta|estos|hi ha|"
-    r"s'han|d'|l'|ajuntaments|convocatòria|subvencions|disposicions)\b", re.I)
-
-
-def _lang(text: str, setting: str) -> str:
-    if setting in ("va", "es"):
-        return setting
-    return "va" if len(_VA_HINTS.findall(text)) >= 2 else "es"
-
-
-def _status_text(ev: dict, lang: str, reranker: bool = True) -> str | None:
-    """Una línea corta por etapa, en el idioma de la pregunta."""
-    va = lang == "va"
+def _status_text(ev: dict, reranker: bool = True) -> str | None:
+    """Una línea corta por etapa, en valenciano."""
     kind = ev.get("type")
-    second = ev.get("pass", 1) > 1
-    tag = (f" (passada {ev['pass']})" if va else f" (pasada {ev['pass']})") if second else ""
+    tag = f" (passada {ev['pass']})" if ev.get("pass", 1) > 1 else ""
     if kind == "start":
-        return "Rebuda la consulta" if va else "Consulta recibida"
+        return "Rebuda la consulta"
     if kind == "embed":
-        return (f"Embedding de la consulta · {ev['dim']} dimensions" if va else f"Embedding de la consulta · {ev['dim']} dimensiones") + tag
+        return f"Embedding de la consulta · {ev['dim']} dimensions" + tag
     if kind == "dense":
-        label = "Cerca densa" if va else "Búsqueda densa"
+        label = "Cerca densa"
         if ev.get("hits"):
-            label += f" · {'millor' if va else 'mejor'} similitud {ev['hits'][0]['s']:.3f}"
+            label += f" · millor similitud {ev['hits'][0]['s']:.3f}"
         return label + tag
     if kind == "bm25":
-        terms = ", ".join(ev.get("tokens", [])[:6])
-        return (f"BM25 · termes: {terms}" if va else f"BM25 · términos: {terms}") + tag
+        return f"BM25 · termes: {', '.join(ev.get('tokens', [])[:6])}" + tag
     if kind == "fusion":
-        return (f"Fusió RRF de {len(ev.get('lists', []))} llistes" if va else f"Fusión RRF de {len(ev.get('lists', []))} listas") + tag
+        return f"Fusió RRF de {len(ev.get('lists', []))} llistes" + tag
     if kind == "candidates":
         if not reranker:
-            return (f"{ev['n']} candidats sense duplicats" if va else f"{ev['n']} candidatos sin duplicados") + tag
-        return (f"Reranker: llegint {ev['n']} candidats…" if va else f"Reranker: leyendo {ev['n']} candidatos…") + tag
+            return f"{ev['n']} candidats sense duplicats" + tag
+        return f"Reranker: llegint {ev['n']} candidats…" + tag
     if kind == "rerank":
         best = ev["hits"][0]["s"] if ev.get("hits") else 0
-        return (f"Reranking fet · millor score {best:.2f}" if va else f"Reranking hecho · mejor score {best:.2f}") + tag
+        return f"Reranking fet · millor score {best:.2f}" + tag
     if kind == "agent_plan":
         step = f"{ev['step']}/{ev['max_steps']}"
         if ev.get("action") == "search":
-            return (f"Agent · pas {step}: busca «{ev.get('query', '')}»" if va else f"Agente · paso {step}: busca «{ev.get('query', '')}»")
+            return f"Agent · pas {step}: busca «{ev.get('query', '')}»"
         if ev.get("action") == "read":
-            return (f"Agent · pas {step}: llig {ev.get('ref', '')} sencer" if va else f"Agente · paso {step}: lee {ev.get('ref', '')} entero")
+            return f"Agent · pas {step}: llig {ev.get('ref', '')} sencer"
         refs = ", ".join(ev.get("evidence") or [])
-        return (f"Agent · pas {step}: acaba ({refs or 'sense evidències'})" if va else f"Agente · paso {step}: termina ({refs or 'sin evidencias'})")
+        return f"Agent · pas {step}: acaba ({refs or 'sense evidències'})"
     if kind == "agent_done":
-        n, m = len(ev.get("evidence", [])), ev.get("n_pool", 0)
-        return f"{n} de {m} evidències triades" if va else f"{n} de {m} evidencias elegidas"
+        return f"{len(ev.get('evidence', []))} de {ev.get('n_pool', 0)} evidències triades"
     if kind == "llm_start":
         return {
-                "agent": "L'agent decidix el pas següent…" if va else "El agente decide el siguiente paso…","rewrite": "Retrieval feble: reformulant la pregunta…" if va else "Retrieval flojo: reformulando la pregunta…",
-                "hyde": "Escrivint un document hipotètic (HyDE)…" if va else "Escribiendo un documento hipotético (HyDE)…",
-                }.get(ev.get("purpose"), "Generant la resposta…" if va else "Generando la respuesta…")
+            "agent": "L'agent decidix el pas següent…",
+            "rewrite": "Retrieval feble: reformulant la pregunta…",
+            "hyde": "Escrivint un document hipotètic (HyDE)…",
+        }.get(ev.get("purpose"), "Generant la resposta…")
     return None
 
 
@@ -103,7 +82,6 @@ class Pipe:
                                 description="URL del servidor RAG Lab tal como la ve Open WebUI (backend).")
         RAGLAB_PUBLIC_URL: str = Field(default="http://localhost:8000",
                                        description="URL del RAG Lab tal como la ve el navegador del usuario (para incrustar el proceso).")
-        ANSWER_LANG: str = Field(default="auto", description="Idioma de la respuesta: auto (el de la pregunta), va o es.")
         SHOW_PROCESS: bool = Field(default=True, description="Incrustar bajo cada respuesta el proceso animado del RAG Lab.")
         EMBED_MODE: str = Field(default="html", description="html: el proceso se incrusta por contenido (funciona con cualquier sandbox). url: iframe que carga la URL del RAG Lab.")
         TIMEOUT_SECONDS: int = Field(default=600, description="Tiempo máximo por consulta (el reranker en CPU es lento).")
@@ -113,7 +91,7 @@ class Pipe:
         self.valves = self.Valves()
 
     def pipes(self) -> list[dict]:
-        return [{"id": pid, "name": names["es"]} for pid, names in PIPELINES.items()]
+        return [{"id": pid, "name": name} for pid, name in PIPELINES.items()]
 
     async def pipe(
         self,
@@ -133,9 +111,8 @@ class Pipe:
             return self._task(__task__, question)
 
         if not question:
-            return "Escribe una pregunta sobre el DOGV."
-        lang = _lang(question, self.valves.ANSWER_LANG)
-        return self._run(pipeline, question, lang, __event_emitter__)
+            return "Escriu una pregunta sobre el DOGV."
+        return self._run(pipeline, question, __event_emitter__)
 
     # ------------------------------------------------------------------ tareas auxiliares
     @staticmethod
@@ -153,29 +130,29 @@ class Pipe:
         return ""
 
     # ------------------------------------------------------------------ proceso incrustado
-    async def _embed(self, run_id: str, lang: str) -> str | None:
+    async def _embed(self, run_id: str) -> str | None:
         """URL del proceso animado o, en modo «html», el documento completo (Open WebUI lo pinta en un srcdoc)."""
         public = self.valves.RAGLAB_PUBLIC_URL.rstrip("/")
         if self.valves.EMBED_MODE == "url":
-            return f"{public}/embed/run/{run_id}?lang={lang}"
+            return f"{public}/embed/run/{run_id}"
         url = f"{self.valves.RAGLAB_URL.rstrip('/')}/embed/html/{run_id}"
         try:
             async with httpx.AsyncClient(timeout=15) as client:
-                r = await client.get(url, params={"base": public, "lang": lang})
+                r = await client.get(url, params={"base": public})
                 r.raise_for_status()
                 return r.text
         except httpx.HTTPError:
             return None
 
     # ------------------------------------------------------------------ ejecución
-    async def _run(self, pipeline: str, question: str, lang: str,
+    async def _run(self, pipeline: str, question: str,
                    emit: Callable[[dict], Awaitable[None]] | None) -> AsyncGenerator[str, None]:
         async def status(text: str, done: bool = False) -> None:
             if emit:
                 await emit({"type": "status", "data": {"description": text, "done": done}})
 
         url = self.valves.RAGLAB_URL.rstrip("/") + "/api/run"
-        payload = {"question": question, "pipeline": pipeline, "options": {"answer_lang": lang}, "generate": True}
+        payload = {"question": question, "pipeline": pipeline, "generate": True}
         result: dict[str, Any] | None = None
         run_id = None
         reranker = True
@@ -197,18 +174,16 @@ class Pipe:
                         if ev.get("type") == "result":
                             result = ev
                             continue
-                        text = _status_text(ev, lang, reranker)
+                        text = _status_text(ev, reranker)
                         if text:
                             await status(text)
         except httpx.ConnectError:
-            await status("Sense connexió amb el RAG Lab" if lang == "va" else "Sin conexión con el RAG Lab", done=True)
-            yield (f"No he pogut connectar amb el RAG Lab en `{self.valves.RAGLAB_URL}`. Comprova que el servidor està en marxa (`python run.py`)."
-                   if lang == "va" else
-                   f"No he podido conectar con el RAG Lab en `{self.valves.RAGLAB_URL}`. Comprueba que el servidor está en marcha (`python run.py`).")
+            await status("Sense connexió amb el RAG Lab", done=True)
+            yield f"No he pogut connectar amb el RAG Lab en `{self.valves.RAGLAB_URL}`. Comprova que el servidor està en marxa (`python run.py`)."
             return
 
         if result is None:
-            await status("Sense resultat" if lang == "va" else "Sin resultado", done=True)
+            await status("Sense resultat", done=True)
             yield "—"
             return
 
@@ -225,7 +200,7 @@ class Pipe:
                                   "name": f"[{c['n']}] {c.get('citation', '')} — {title}", "url": c.get("url", "")}],
                 }})
             if self.valves.SHOW_PROCESS and run_id:
-                embed = await self._embed(run_id, lang)
+                embed = await self._embed(run_id)
                 if embed:
                     await emit({"type": "embeds", "data": {"embeds": [embed], "replace": True}})
 
@@ -235,12 +210,10 @@ class Pipe:
         tail = f" · {verdict}" if verdict and pipeline == "corrective" else ""
         steps = (result.get("trace") or {}).get("steps")
         if steps and pipeline == "agentic":
-            tail = f" · {len(steps)} passos" if lang == "va" else f" · {len(steps)} pasos"
-        await status((f"Fet en {secs:.1f} s · {n} fragments{tail}" if lang == "va" else f"Listo en {secs:.1f} s · {n} fragmentos{tail}"), done=True)
+            tail = f" · {len(steps)} passos"
+        await status(f"Fet en {secs:.1f} s · {n} fragments{tail}", done=True)
 
         answer = result.get("answer") or ""
         if not result.get("generated"):
-            answer = ("El RAG Lab no té cap LLM connectat: es mostren només els fragments recuperats (vegeu les fonts)."
-                      if lang == "va" else
-                      "El RAG Lab no tiene ningún LLM conectado: se muestran solo los fragmentos recuperados (ver las fuentes).")
+            answer = "El RAG Lab no té cap LLM connectat: es mostren només els fragments recuperats (vegeu les fonts)."
         yield answer

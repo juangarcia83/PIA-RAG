@@ -1,7 +1,7 @@
-// Arranque: pantalla de carga, navegación por hash, tema, idioma y conexión con el LLM.
+// Arranque: pantalla de carga, navegación por hash, tema y conexión con el LLM.
 import { getJSON, postJSON } from "./api.js";
 import { $, $$, h, icon, openLayer, toast, esc } from "./ui.js";
-import { t, getLang, setLang } from "./i18n.js";
+import { t } from "./i18n.js";
 import { startMotion, moveTabInk } from "./motion.js";
 import { askView } from "./views/ask.js";
 import { compareView } from "./views/compare.js";
@@ -33,7 +33,7 @@ function route({ keepScroll = false } = {}) {
 $$(".tab").forEach((tab) => tab.addEventListener("click", () => { location.hash = `#/${tab.dataset.route}`; }));
 addEventListener("hashchange", () => route());
 
-// ------------------------------------------------------------------ idioma
+// ------------------------------------------------------------------ textos fijos
 /** Textos fijos de index.html: cada elemento con data-i18n guarda su texto en castellano como clave. */
 function applyStaticTexts() {
   $$("[data-i18n]").forEach((el) => {
@@ -42,16 +42,7 @@ function applyStaticTexts() {
   });
   $$("[data-i18n-label]").forEach((el) => el.setAttribute("aria-label", t(el.dataset.i18nLabel)));
   $$("[data-i18n-alt]").forEach((el) => el.setAttribute("alt", t(el.dataset.i18nAlt)));
-  $$("#lang-switch button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === getLang()));
 }
-$$("#lang-switch button").forEach((b) => b.addEventListener("click", () => {
-  if (b.dataset.lang === getLang()) return;
-  setLang(b.dataset.lang);
-  applyStaticTexts();
-  renderLLMPill();
-  if (state.status?.status?.ready) route({ keepScroll: true });
-  requestAnimationFrame(moveTabInk);
-}));
 applyStaticTexts();
 
 // ------------------------------------------------------------------ tema

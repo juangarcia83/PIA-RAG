@@ -7,13 +7,13 @@ los mismos pipelines que el notebook, y traduce sus eventos al formato de Open W
 | En el RAG Lab | En Open WebUI |
 |---|---|
 | Elegir arquitectura | Selector de modelos: `DOGV · Naive`, `· Híbrido`, `· Advanced`, `· Corrective`, `· Agentic` |
-| Etapas en directo | Estado bajo la respuesta («BM25 · términos…», «Reranker: leyendo 15 candidatos…», «Listo en 5,1 s») |
+| Etapas en directo | Estado bajo la respuesta («BM25 · termes…», «Reranker: llegint 15 candidats…», «Fet en 5.1 s») |
 | Fuentes | Citas nativas [1], [2]… con el fragmento y el enlace al PDF |
 | Grafo animado y recorrido de candidatos | Incrustados bajo cada respuesta, con enlace «Abrir en RAG Lab» a esa misma ejecución |
 | Comparar | Chat con varios modelos a la vez (lado a lado) |
 | — | Valoraciones 👍/👎 y modo Arena: evaluación humana a ciegas |
 
-El idioma de la respuesta sigue al de la pregunta (valenciano o castellano). Las tareas auxiliares de Open WebUI
+Las respuestas y los estados van siempre en valenciano. Las tareas auxiliares de Open WebUI
 (título, etiquetas) se contestan sin lanzar el RAG.
 
 ## Puesta en marcha (local)
@@ -39,7 +39,6 @@ contenido de `dogv_rag_pipe.py` a mano en *Panel de administración → Funcione
 |---|---|---|
 | `RAGLAB_URL` | `http://localhost:8000` | El RAG Lab visto desde el servidor de Open WebUI (en Docker, el nombre del servicio). |
 | `RAGLAB_PUBLIC_URL` | `http://localhost:8000` | El RAG Lab visto desde el navegador; solo para el enlace «Abrir en RAG Lab». |
-| `ANSWER_LANG` | `auto` | `auto` (el de la pregunta), `va` o `es`. |
 | `SHOW_PROCESS` | `true` | Incrustar el proceso animado bajo cada respuesta. |
 | `EMBED_MODE` | `html` | `html`: vista autocontenida (estilos, código y datos dentro; funciona con cualquier sandbox). `url`: iframe que carga `/embed/run/<id>` del RAG Lab. |
 | `TIMEOUT_SECONDS` | `600` | El reranker en CPU tarda ~30 s por consulta. |

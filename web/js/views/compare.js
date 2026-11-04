@@ -1,8 +1,8 @@
 // Comparar: la misma pregunta en varias arquitecturas, lado a lado, con el análisis de en qué difieren.
 import { streamRun } from "../api.js";
 import { h, hero, icon, esc, fmtMs, short, bindTip, renderAnswer, toast, store, PIPES, PIPE_ORDER } from "../ui.js";
-import { t, getLang } from "../i18n.js";
-import { examples, sourceCard, timingBar } from "./ask.js";
+import { t } from "../i18n.js";
+import { EXAMPLES, sourceCard, timingBar } from "./ask.js";
 import { stagger } from "../motion.js";
 
 const STEPS = {
@@ -43,7 +43,7 @@ export function compareView(root, state) {
     h("div", { class: "toolbar" }, pick,
       h("label", { class: "switch" }, h("input", { type: "checkbox", checked: generate, disabled: !st.llm.available, onchange: (e) => { generate = e.target.checked; } }),
         st.llm.available ? t("Generar respuestas") : t("Sin LLM · solo retrieval"))),
-    h("div", { class: "chips suggest" }, examples().slice(0, 4).map((q) => h("button", { class: "chip", onclick: () => { input.value = q; autosize(); run(); } }, q))),
+    h("div", { class: "chips suggest" }, EXAMPLES.slice(0, 4).map((q) => h("button", { class: "chip", onclick: () => { input.value = q; autosize(); run(); } }, q))),
     out,
   );
   if (state.lastRun?.question) { input.value = state.lastRun.question; autosize(); }
@@ -77,7 +77,7 @@ export function compareView(root, state) {
       c.body.replaceChildren(h("div", { class: "skeleton" }, h("span"), h("span"), h("span", { class: "short" })));
       const seen = new Set();
       try {
-        await streamRun({ question: q, pipeline: p, generate, options: { answer_lang: getLang() } }, (ev) => {
+        await streamRun({ question: q, pipeline: p, generate }, (ev) => {
           const key = ev.type === "llm" && ev.purpose !== "answer" ? null : ev.type;
           if (key) seen.add(key);
           [...c.bar.children].forEach((sp, i) => {

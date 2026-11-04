@@ -249,7 +249,7 @@ def embed_run(run_id: str):
 
 
 @app.get("/embed/html/{run_id}")
-def embed_html(run_id: str, base: str = "", lang: str = "es"):
+def embed_html(run_id: str, base: str = ""):
     """La misma vista como HTML autocontenido (estilos, código y datos dentro), para incrustarlo por contenido.
 
     Open WebUI pinta así los embeds que no son URL (iframe srcdoc con sandbox): no pide nada al RAG Lab, así que
@@ -261,7 +261,7 @@ def embed_html(run_id: str, base: str = "", lang: str = "es"):
         raise HTTPException(404, "Ejecución no encontrada")
     if base and not base.startswith(("http://", "https://")):
         raise HTTPException(400, "base debe ser una URL http(s)")
-    return HTMLResponse(embed_page(record, lang if lang in ("es", "va") else "es", base.rstrip("/")))
+    return HTMLResponse(embed_page(record, base.rstrip("/")))
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

@@ -569,11 +569,7 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .footer .motto em { font-style: italic; background: linear-gradient(90deg, #a99cff, #41b8ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
 @media (max-width: 720px) { .footer .motto { font-size: 24px; } }
 
-/* ------------------------------------------------------------------ idioma y financiación */
-.lang-switch { display: inline-flex; padding: 2px; border-radius: 999px; background: var(--sunken); border: 1px solid var(--line); }
-.lang-switch button { border: 0; background: transparent; cursor: pointer; font: 600 11.5px/1 var(--mono); letter-spacing: .04em;
-  color: var(--muted); padding: 6px 9px; border-radius: 999px; transition: background .2s, color .2s; }
-.lang-switch button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+/* ------------------------------------------------------------------ financiación */
 .funding { background: #ffffff; border-top: 1px solid rgba(15, 18, 34, 0.08); }
 .funding img { display: block; max-width: min(860px, calc(100% - 32px)); height: auto; margin: 0 auto; padding: 14px 0 12px; }
 @media (max-width: 720px) { .funding img { padding: 10px 0; } }

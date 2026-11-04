@@ -1,18 +1,16 @@
 // Vista incrustable de una ejecución: el grafo animado y el recorrido de candidatos, en compacto.
-// La usa Open WebUI (evento «embeds») bajo cada respuesta. URL: /embed/run/<id>?lang=va&theme=dark
+// La usa Open WebUI (evento «embeds») bajo cada respuesta. URL: /embed/run/<id>?theme=dark
 import { getJSON } from "./api.js";
 import { h, icon, fmtMs, short, PIPES, sleep } from "./ui.js";
-import { t, setLang } from "./i18n.js";
+import { t } from "./i18n.js";
 import { PipelineGraph } from "./viz/pipeline.js";
 import { RankFlow } from "./viz/flow.js";
 import { describe } from "./narrate.js";
 
-// Dos modos: por URL (/embed/run/<id>?lang=…), que pide los datos al servidor, o autocontenido (srcdoc), con el
+// Dos modos: por URL (/embed/run/<id>), que pide los datos al servidor, o autocontenido (srcdoc), con el
 // código, los estilos y los datos de la ejecución dentro del propio HTML (RAGLAB_EMBED).
 const injected = window.RAGLAB_EMBED || null;
 const params = new URLSearchParams(location.search);
-const lang = injected?.lang || params.get("lang");
-if (lang) setLang(lang);
 if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
 const runId = injected?.run || location.pathname.split("/").filter(Boolean).pop();
 const labBase = injected?.base || location.origin;
