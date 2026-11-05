@@ -199,23 +199,21 @@ export function askView(root, state, { restore = false } = {}) {
   modelPick.setAttribute("aria-label", t("Modelo"));
 
   // ---------- documentos adjuntos (modo simple): botón «+», etiquetas y arrastrar y soltar sobre la caja
-  // Los documentos son de la conversación: se envían con cada pregunta hasta que se quitan o se empieza otra. Al volver
-  // al inicio con una conversación guardada, sus documentos quedan aparcados (`parked`) y no se ven: lo que se adjunte
-  // ahí es para una conversación nueva. «Retomarla» los recupera; una pregunta nueva los descarta con la conversación.
+  // Lo adjuntado espera en la caja de pregunta (`attachments`, se puede quitar) hasta que se envía: entonces aparece
+  // sobre esa pregunta en el chat y pasa a ser de la conversación (`sent`), que lo manda con cada pregunta siguiente.
+  // Una conversación nueva (preguntar desde el inicio o «Nueva conversación») descarta los de la anterior.
   const valid = (list) => (list || []).filter((a) => a.id);
-  const parkedAtStart = (store("chat") || []).length > 0 && store("chatOpen") === false;
-  let attachments = valid(parkedAtStart ? store("draftAttachments") : store("chatAttachments"));   // los visibles
-  let parked = parkedAtStart ? valid(store("chatAttachments")) : [];                                // los aparcados
+  let attachments = valid(store("draftAttachments"));   // pendientes, en la caja de pregunta
+  let sent = valid(store("chatAttachments"));           // ya enviados: de la conversación
   const fileInput = h("input", { type: "file", accept: ATTACH_ACCEPT, multiple: true, class: "sr-only", tabindex: -1,
     "aria-hidden": "true", onchange: (e) => { addFiles([...e.target.files]); e.target.value = ""; } });
   const attachBtn = h("button", { type: "button", class: "attach-btn std-only", title: t("Adjuntar un documento (PDF, DOCX o TXT)"),
     "aria-label": t("Adjuntar un documento (PDF, DOCX o TXT)"), onclick: () => fileInput.click() }, icon("plus"));
   const attachRow = h("div", { class: "attach-row std-only hidden", role: "group", "aria-label": t("Documentos adjuntos") });
+  const fileInfo = (a) => ({ id: a.id, name: a.name, kind: a.kind, pages: a.pages });
   function saveAttachments() {
-    const ready = attachments.filter((a) => !a.busy);
-    const isParked = !sessionOpen && thread.childElementCount > 0;
-    store("chatAttachments", isParked ? parked : ready);
-    store("draftAttachments", isParked ? ready : []);
+    store("chatAttachments", sent.map(fileInfo));
+    store("draftAttachments", attachments.filter((a) => !a.busy).map(fileInfo));
   }
   // borra del servidor los documentos de una conversación que se descarta
   const dropAttachments = (list) => list.forEach((a) => a.id && fetch(`/api/attachments/${a.id}`, { method: "DELETE" }).catch(() => {}));
@@ -232,7 +230,7 @@ export function askView(root, state, { restore = false } = {}) {
   }
   async function addFiles(files) {
     for (const file of files) {
-      if (attachments.length >= ATTACH_MAX) { toast(t("Como máximo {n} documentos por conversación.", { n: ATTACH_MAX })); break; }
+      if (attachments.length + sent.length >= ATTACH_MAX) { toast(t("Como máximo {n} documentos por conversación.", { n: ATTACH_MAX })); break; }
       const tmp = { name: file.name, busy: true };
       attachments.push(tmp);
       paintAttachments();
@@ -253,10 +251,10 @@ export function askView(root, state, { restore = false } = {}) {
     saveAttachments();
   }
   // los guardados en el navegador pueden haberse perdido si el servidor se ha reiniciado
-  for (const a of [...attachments, ...parked]) {
+  for (const a of [...attachments, ...sent]) {
     getJSON(`/api/attachments/${a.id}`).catch(() => {
       attachments = attachments.filter((x) => x !== a);
-      parked = parked.filter((x) => x !== a);
+      sent = sent.filter((x) => x !== a);
       paintAttachments();
       saveAttachments();
       toast(t("«{name}» ya no está en el servidor: vuelve a adjuntarlo.", { name: a.name }));
@@ -453,50 +451,52 @@ export function askView(root, state, { restore = false } = {}) {
     store("chatOpen", open);
     paintChat();
   }
-  // «Retomarla»: vuelve a la conversación guardada con sus documentos (lo adjuntado en el inicio se descarta)
+  // «Retomarla»: vuelve a la conversación guardada (con sus documentos, que se ven sobre las preguntas)
   function openSession() {
     if (sessionOpen) return;
-    dropAttachments(attachments);
-    attachments = parked;
-    parked = [];
     setSession(true);
-    saveAttachments();
-    paintAttachments();
     thread.lastElementChild?.scrollIntoView({ block: "start" });
     ta.focus();
   }
   // «Inicio»: vuelve a la pantalla inicial, que es el principio de una conversación nueva; la actual queda guardada
-  // (con sus documentos aparcados) para retomarla
+  // para retomarla (lo pendiente en la caja se queda en la caja)
   function closeSession() {
     if (!sessionOpen) return;
-    parked = attachments.filter((a) => !a.busy);
-    attachments = [];
     setSession(false);
-    saveAttachments();
-    paintAttachments();
     scrollTo({ top: 0 });
     ta.focus();
   }
   // una pregunta escrita en el inicio empieza una conversación nueva: la guardada se descarta con sus documentos
   function startNewConversation() {
-    dropAttachments(parked);
-    parked = [];
+    dropAttachments(sent);
+    sent = [];
     chat = [];
     store("chat", chat);
     thread.replaceChildren();
     setSession(true);
     saveAttachments();
   }
-  function addTurn(question) {
+  // documentos enviados con una pregunta: tarjetas sobre su burbuja, con su misma forma
+  function fileCards(files) {
+    if (!files?.length) return null;
+    return h("ul", { class: "chat-files", "aria-label": t("Documentos adjuntos") },
+      ...files.map((a) => h("li", { class: "chat-file" },
+        h("span", { class: "chat-file-ico", "aria-hidden": "true" }, icon("doc")),
+        h("span", { class: "chat-file-text" },
+          h("span", { class: "att-name", title: a.name }, short(a.name, 48)),
+          h("span", { class: "att-meta" }, [(a.kind || a.name.split(".").pop()).toUpperCase(),
+            a.pages ? t("{n} pág.", { n: a.pages }) : null].filter(Boolean).join(" · "))))));
+  }
+  function addTurn(question, files = []) {
     const body = h("div");
-    const turn = h("div", { class: "chat-turn" },
+    const turn = h("div", { class: "chat-turn" }, fileCards(files),
       h("div", { class: "chat-q" }, h("span", { class: "sr-only" }, t("Tu pregunta:"), " "), question), body);
     thread.append(turn);
     paintChat();
     return { turn, body };
   }
   function renderStoredTurn(turn) {
-    const { body } = addTurn(turn.question);
+    const { body } = addTurn(turn.question, turn.files);
     const run = new RunPanel(body, turn.pipeline, st, turn.question, { simple: true, scroll: false, onExpand: () => expandStored(turn) });
     run.graph.quiet = true;
     run.onEvent(turn.result);
@@ -513,9 +513,9 @@ export function askView(root, state, { restore = false } = {}) {
     chat = [];
     store("chat", chat);
     thread.replaceChildren();
-    dropAttachments([...attachments, ...parked]);   // los adjuntos son de la conversación
+    dropAttachments([...attachments, ...sent]);   // los adjuntos son de la conversación
     attachments = [];
-    parked = [];
+    sent = [];
     paintAttachments();
     setSession(true);   // la siguiente pregunta abre una sesión nueva
     saveAttachments();
@@ -534,18 +534,24 @@ export function askView(root, state, { restore = false } = {}) {
     const history = chat.slice(-CHAT_HISTORY).map((x) => ({ question: x.result.question || x.question, answer: short(x.result.answer || "", 1200) }));
     ta.value = "";
     autosize();
-    const { turn, body } = addTurn(q);
+    // lo pendiente sale de la caja y se queda sobre esta pregunta; desde ahora es de la conversación
+    const files = attachments.map(fileInfo);
+    sent = [...sent, ...attachments];
+    attachments = [];
+    paintAttachments();
+    saveAttachments();
+    const { turn, body } = addTurn(q, files);
     turn.scrollIntoView({ behavior: "smooth", block: "start" });
     const run = new RunPanel(body, pipe, st, q, { simple: true, scroll: false, onExpand: () => expand(run.snapshot()) });
     searchBox.classList.add("busy");
     try {
-      await streamRun({ question: q, pipeline: pipe, history, generate: st.llm.available, attachments: attachments.map((a) => a.id) },
+      await streamRun({ question: q, pipeline: pipe, history, generate: st.llm.available, attachments: sent.map((a) => a.id) },
         (ev) => run.onEvent(ev), controller.signal);
       const snap = run.snapshot();
       state.lastRun = snap;
       if (snap.result) {
         const runId = snap.events.find((e) => e.type === "start")?.run_id;
-        chat = [...chat, { question: q, pipeline: pipe, run_id: runId, result: { ...snap.result, messages: null } }].slice(-CHAT_TURNS);
+        chat = [...chat, { question: q, pipeline: pipe, run_id: runId, files, result: { ...snap.result, messages: null } }].slice(-CHAT_TURNS);
         store("chat", chat);
       }
     } catch (e) {
