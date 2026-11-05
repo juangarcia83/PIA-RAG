@@ -64,6 +64,7 @@ export function icon(name, cls = "icon") {
     play: "M7 5l12 7-12 7z",
     pause: "M8 5v14M16 5v14",
     plus: "M12 5v14M5 12h14",
+    clip: "M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8",
     replay: "M4 4v6h6M20 12a8 8 0 1 1-2.3-5.7L20 9",
     prev: "M15 6l-6 6 6 6",
     next: "M9 6l6 6-6 6",
@@ -196,7 +197,9 @@ export function renderAnswer(text) {
     .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
     .replace(/(^|[^*])\*(?!\s)(.+?)\*/g, "$1<i>$2</i>")
     .replace(/`([^`]+)`/g, '<code class="mono">$1</code>')
-    .replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_, nums) => nums.split(/\s*,\s*/).map((n) => `<span class="cite" data-n="${n}">${n}</span>`).join(""));
+    // citas [1], [2, 3] del DOGV y [D1] de los documentos adjuntos
+    .replace(/\[(D?\d+(?:\s*,\s*D?\d+)*)\]/g, (_, nums) => nums.split(/\s*,\s*/)
+      .map((n) => `<span class="cite${n[0] === "D" ? " cite-doc" : ""}" data-n="${n}">${n}</span>`).join(""));
   const flush = () => { if (list) { html += `</${list}>`; list = null; } };
   for (const raw of lines) {
     const line = raw.trim();

@@ -317,44 +317,71 @@ class Engine:
         lines = [x.strip().strip("\"«»").strip() for x in out.splitlines() if x.strip()]
         return lines[0] if lines else question
 
+    # ------------------------------------------------------------------ documentos adjuntos
+    def _plain_embedder(self):
+        """El embedder sin el contador de la barra de carga (los adjuntos no son parte del índice)."""
+        return getattr(self.embedder, "_inner", self.embedder)
+
+    def add_attachment(self, name: str, data: bytes) -> dr.Attachment:
+        """Convierte y, si es largo, indexa un documento del usuario. La conversión va fuera del candado; los
+        embeddings, dentro, porque comparten el modelo con las consultas."""
+        att = dr.Attachment.from_bytes(name, data)
+        if att.mode == "index":
+            t0 = time.perf_counter()
+            with self.lock:
+                att.build_index(self._plain_embedder())
+            att.seconds = round(att.seconds + time.perf_counter() - t0, 2)
+        return att
+
     def run(self, question: str, name: str, filters: dict | None, options: dict | None, generate: bool,
-            emit: Emit, history: list[dict] | None = None) -> None:
+            emit: Emit, history: list[dict] | None = None, attachments: list | None = None) -> None:
         pipe = self.pipelines[name]
         flt = self.filters(filters)
         with self.lock:
             original, question = question, self.standalone_question(question, history)
+            # fragmentos de los documentos adjuntos (todos si son cortos; los pertinentes a la pregunta si no)
+            blocks = dr.attachment_blocks(attachments or [], question, self._plain_embedder())
             gen = None if (generate and self.generator.available) else NullGenerator("generación desactivada")
-            with overrides(pipe, options or {}, generator=gen):
-                rec = Recorder(self, pipe, emit)
-                emit({"type": "start", "t": 0, "pipeline": name, "question": question,
-                      "original": original if question != original else None,
-                      "config": self.pipeline_config(name), "llm": self.llm_status() if gen is None else None,
-                      "filters": {k: v for k, v in vars(flt).items() if v is not None} if flt else {},
-                      "filtered_chunks": int(flt.mask(pipe.index.chunks).sum()) if flt else len(pipe.index)})
-                with instrument(pipe, rec):
-                    result = pipe.answer(question, flt)
-                ranked = sorted(range(len(result.contexts)), key=lambda i: -result.contexts[i].score)
-                rank_of = {i: r + 1 for r, i in enumerate(ranked)}
-                contexts = []
-                for i, c in enumerate(result.contexts):
-                    contexts.append({
-                        "n": i + 1, "rank": rank_of[i], "chunk_ids": [int(x) for x in c.chunk_ids],
-                        "code": c.code.replace("_", "/"), "doc": c.doc_id, "title": c.title, "date": c.date,
-                        "organismo": c.organismo, "section": c.section, "url": c.url, "text": c.text,
-                        "citation": c.citation(), "score": rounded(c.score),
-                        "scores": {k: rounded(v) for k, v in c.scores.items()}})
-                messages = None
-                if contexts and not result.trace.get("abstain"):
-                    messages = prompts.build_messages(question, result.contexts, pipe.answer_lang)
-                trace = {k: v for k, v in result.trace.items() if k != "timings"}
-                index_name = PIPELINE_INFO[name]["index"]
-                emit({"type": "result", "t": rec.now(), "pipeline": name, "question": question, "answer": result.answer,
-                      "contexts": contexts, "timings": {k: round(v * 1000, 1) for k, v in result.timings.items()},
-                      "total_ms": round(result.total_seconds * 1000, 1), "trace": trace, "messages": messages,
-                      "query_tokens": rec.query_tokens, "index": index_name,
-                      "query_xy": self.project_query(index_name, rec.query_vec),
-                      "generated": gen is None,
-                      "chunks": rec.meta([cid for c in result.contexts for cid in c.chunk_ids])})
+            pipe.attachments = blocks
+            try:
+                self._answer(pipe, name, question, original, flt, options, gen, blocks, emit)
+            finally:
+                pipe.attachments = []
+
+    def _answer(self, pipe, name, question, original, flt, options, gen, blocks, emit) -> None:
+        """Ejecuta la arquitectura instrumentada y emite el resultado (dentro del candado de `run`)."""
+        with overrides(pipe, options or {}, generator=gen):
+            rec = Recorder(self, pipe, emit)
+            emit({"type": "start", "t": 0, "pipeline": name, "question": question,
+                  "original": original if question != original else None,
+                  "config": self.pipeline_config(name), "llm": self.llm_status() if gen is None else None,
+                  "filters": {k: v for k, v in vars(flt).items() if v is not None} if flt else {},
+                  "filtered_chunks": int(flt.mask(pipe.index.chunks).sum()) if flt else len(pipe.index)})
+            with instrument(pipe, rec):
+                result = pipe.answer(question, flt)
+            ranked = sorted(range(len(result.contexts)), key=lambda i: -result.contexts[i].score)
+            rank_of = {i: r + 1 for r, i in enumerate(ranked)}
+            contexts = []
+            for i, c in enumerate(result.contexts):
+                contexts.append({
+                    "n": i + 1, "rank": rank_of[i], "chunk_ids": [int(x) for x in c.chunk_ids],
+                    "code": c.code.replace("_", "/"), "doc": c.doc_id, "title": c.title, "date": c.date,
+                    "organismo": c.organismo, "section": c.section, "url": c.url, "text": c.text,
+                    "citation": c.citation(), "score": rounded(c.score),
+                    "scores": {k: rounded(v) for k, v in c.scores.items()}})
+            messages = None
+            if (contexts and not result.trace.get("abstain")) or blocks:
+                messages = prompts.build_messages(question, result.contexts, pipe.answer_lang, blocks)
+            trace = {k: v for k, v in result.trace.items() if k != "timings"}
+            index_name = PIPELINE_INFO[name]["index"]
+            emit({"type": "result", "t": rec.now(), "pipeline": name, "question": question, "answer": result.answer,
+                  "contexts": contexts, "attachments": blocks,
+                  "timings": {k: round(v * 1000, 1) for k, v in result.timings.items()},
+                  "total_ms": round(result.total_seconds * 1000, 1), "trace": trace, "messages": messages,
+                  "query_tokens": rec.query_tokens, "index": index_name,
+                  "query_xy": self.project_query(index_name, rec.query_vec),
+                  "generated": gen is None,
+                  "chunks": rec.meta([cid for c in result.contexts for cid in c.chunk_ids])})
 
     # ------------------------------------------------------------------ grounding
 

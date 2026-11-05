@@ -397,6 +397,7 @@ body.chat-session main { padding-top: 0; padding-bottom: 0; }
   background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-lg); color: var(--ink-2); font-size: 14px; }
 .resume-bar > .icon { color: var(--accent); }
 .resume-bar > span { flex: 1; min-width: 180px; }
+.resume-bar > .resume-hint { flex-basis: 100%; font-size: 12.5px; color: var(--muted); }
 .chat-turn { display: grid; gap: 14px; scroll-margin-top: calc(var(--nav-h) + 16px); }
 .chat-q { justify-self: end; max-width: min(78%, 620px); background: var(--sunken); color: var(--ink); padding: 10px 16px;
   border-radius: 20px 20px 6px 20px; font-size: 15.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; animation: fade .25s var(--ease); }
@@ -422,6 +423,30 @@ body.chat-session main { padding-top: 0; padding-bottom: 0; }
 @keyframes typing { 0%, 60%, 100% { opacity: .25; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
 .simple-note { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 13px; margin-bottom: 10px; }
 .simple-note .icon { width: 15px; height: 15px; flex: none; margin-top: 2px; }
+/* documentos adjuntos (modo simple): botón «+», etiquetas y citas [D1] con su propio color */
+.attach-btn { flex: none; width: 36px; height: 36px; align-self: flex-end; margin: 0 0 4px -8px; border: 0; border-radius: 50%;
+  background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+.attach-btn:hover { background: var(--sunken); color: var(--ink); }
+.attach-btn .icon { width: 20px; height: 20px; }
+.search-box.drop { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--focus); }
+.attach-row { max-width: 980px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.att-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 4px 4px 4px 10px; border: 1px solid var(--line-strong);
+  border-radius: 999px; background: var(--surface); font-size: 13px; color: var(--ink); }
+.att-chip > .icon { width: 15px; height: 15px; color: var(--accent); flex: none; }
+.att-chip .spinner { width: 14px; height: 14px; }
+.att-chip.busy { padding-right: 12px; }
+.att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; min-width: 0; }
+.att-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.att-x { flex: none; border: 0; background: none; color: var(--muted); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.att-x:hover { background: var(--sunken); color: var(--ink); }
+.att-x .icon { width: 13px; height: 13px; }
+.att-note { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.cite.cite-doc { background: color-mix(in srgb, var(--c-corrective) 20%, transparent); color: var(--ink); }
+.cite.cite-doc:hover, .cite.cite-doc.on { background: var(--c-corrective); color: #fff; }
+@media (max-width: 640px) {
+  .search-box textarea { order: -1; }
+  .attach-btn { margin: 0; align-self: center; }
+}
 /* ficha de una fuente al pasar por su cita */
 .cite.on { background: var(--accent); color: #fff; }
 .cite-pop { position: fixed; z-index: 130; width: min(380px, calc(100vw - 16px)); background: var(--surface); color: var(--ink);

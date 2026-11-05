@@ -30,11 +30,14 @@ import uuid
 from collections import OrderedDict
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+import dogvrag as dr
 
 from .config import PROJECT_DIR, load_settings
 from .embed_bundle import page as embed_page
@@ -56,6 +59,9 @@ PUBLIC = os.environ.get("RAGLAB_PUBLIC", "").lower() in ("1", "true", "yes")
 RUNS: OrderedDict[str, dict] = OrderedDict()   # ejecuciones recientes, para reabrirlas o incrustarlas
 MAX_RUNS = 300
 HISTORY_TURNS = 4                                # turnos de conversación que se usan para entender un seguimiento
+ATTACHMENTS: OrderedDict[str, dr.Attachment] = OrderedDict()   # documentos adjuntos, solo en memoria
+MAX_ATTACHMENTS = 30                             # adjuntos guardados a la vez (se descartan los más antiguos)
+MAX_PER_QUESTION = 3                             # adjuntos por pregunta
 
 # Las vistas incrustadas (iframes sin «same origin» en Open WebUI) cargan módulos y datos desde otro origen.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
@@ -140,6 +146,43 @@ class RunRequest(BaseModel):
     options: dict = Field(default_factory=dict)
     generate: bool = True
     history: list[ChatTurn] = Field(default_factory=list)   # turnos anteriores de la conversación (modo simple)
+    attachments: list[str] = Field(default_factory=list)    # ids de documentos adjuntos (POST /api/attachments)
+
+
+# --------------------------------------------------------------------------- documentos adjuntos
+# Solo en memoria: el fichero llega como cuerpo binario (sin multipart) y nunca se escribe en disco. Los más antiguos
+# se descartan al llegar a MAX_ATTACHMENTS; al reiniciar el servidor se pierden todos.
+
+
+@app.post("/api/attachments")
+async def upload_attachment(request: Request, name: str):
+    _ready()
+    declared = int(request.headers.get("content-length") or 0)
+    if declared > dr.attachments.MAX_BYTES:
+        raise HTTPException(413, f"El fitxer supera el màxim de {dr.attachments.MAX_BYTES // (1024 * 1024)} MB.")
+    data = await request.body()
+    try:
+        att = await run_in_threadpool(engine.add_attachment, name, data)
+    except dr.AttachmentError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    ATTACHMENTS[att.id] = att
+    while len(ATTACHMENTS) > MAX_ATTACHMENTS:
+        ATTACHMENTS.popitem(last=False)
+    return att.info()
+
+
+@app.get("/api/attachments/{att_id}")
+def attachment_info(att_id: str):
+    att = ATTACHMENTS.get(att_id)
+    if att is None:
+        raise HTTPException(404, "Document no disponible")
+    return att.info()
+
+
+@app.delete("/api/attachments/{att_id}")
+def delete_attachment(att_id: str):
+    ATTACHMENTS.pop(att_id, None)
+    return {"ok": True}
 
 
 @app.post("/api/run")
@@ -150,6 +193,9 @@ def run(req: RunRequest):
         raise HTTPException(404, "Arquitectura desconocida")
     if not req.question.strip():
         raise HTTPException(400, "Escribe una pregunta")
+    attachments = [ATTACHMENTS.get(i) for i in req.attachments[:MAX_PER_QUESTION]]
+    if any(a is None for a in attachments):
+        raise HTTPException(404, "Algun document adjunt ja no està disponible (el servidor s'ha reiniciat): torna a adjuntar-lo.")
     q: queue.Queue = queue.Queue()
     done = object()
     run_id = uuid.uuid4().hex[:12]
@@ -167,7 +213,8 @@ def run(req: RunRequest):
     def worker():
         try:
             history = [t.model_dump() for t in req.history[-HISTORY_TURNS:]]
-            engine.run(req.question.strip(), req.pipeline, req.filters, req.options, req.generate, emit, history=history)
+            engine.run(req.question.strip(), req.pipeline, req.filters, req.options, req.generate, emit,
+                       history=history, attachments=attachments)
         except Exception as exc:  # el error llega a la interfaz como un evento más
             emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
         finally:

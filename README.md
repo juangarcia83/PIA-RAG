@@ -16,7 +16,13 @@ Proyecto de ValgrAI · Generalitat Valenciana.
 
 Secciones de la web: **Preguntar** (una arquitectura en directo, con grafo animado, narración y análisis),
 **Comparar**, **Corpus**, **Mapa semántico**, **Evaluación** (hit@k, MRR, IC por bootstrap) y **Arquitecturas**.
-Interfaz en castellano y valenciano.
+Interfaz en valenciano.
+
+**Documentos adjuntos** (chat del modo simple): el botón **+** o arrastrar y soltar añade un PDF, DOCX o TXT
+(máx. 20 MB y 100 páginas) a la conversación. Los cortos (≤ 15.000 caracteres) entran enteros en el prompt; los
+largos se trocean e indexan (BM25 + denso, RRF) y en cada pregunta se recuperan sus 4 fragmentos más pertinentes.
+La respuesta los cita como [D1], [D2]… junto a las fuentes del DOGV. Solo se guardan en memoria del servidor, y su
+texto se envía al LLM configurado. PDF con PyMuPDF4LLM; DOCX leído con la biblioteca estándar; sin OCR.
 
 ---
 
@@ -74,6 +80,7 @@ app/                        servidor (FastAPI)
   config.py                 configuración y clave del LLM
 dogvrag/                    librería RAG
   corpus.py, cleaning.py    carga del DOGV (Markdown + metadatos oficiales) y limpieza
+  attachments.py            documentos adjuntos: conversión (PDF, DOCX, TXT), troceado e índice en memoria
   chunking.py               FixedChunker, StructureChunker
   embeddings.py, rerank.py  bi-encoder y cross-encoder (sentence-transformers)
   sparse.py, vectorstore.py BM25 (bm25s) y búsqueda densa exacta

@@ -61,6 +61,16 @@ USER = {
     "es": "Fragmentos del DOGV:\n\n{contexts}\n\nPregunta: {question}\n\nResponde siguiendo el formato y la norma lingüística indicados.",
 }
 
+# Documentos que adjunta el usuario: van antes de los fragmentos del DOGV, numerados D1, D2… para no confundirlos
+ATTACHMENTS = {
+    "va": ("Documents adjuntats per l'usuari. Usa'ls quan siguen pertinents per a la pregunta, cita'ls amb [D1], [D2]… "
+           "i deixa clar què diu el document adjunt i què diu el DOGV:\n\n{blocks}"),
+    "es": ("Documentos adjuntados por el usuario. Úsalos cuando sean pertinentes para la pregunta, cítalos con [D1], "
+           "[D2]… y deja claro qué dice el documento adjunto y qué dice el DOGV:\n\n{blocks}"),
+}
+NO_FRAGMENTS = {"va": "(cap fragment del DOGV rellevant)", "es": "(ningún fragmento del DOGV relevante)"}
+_PAGE = {"va": "pàg.", "es": "pág."}
+
 ABSTAIN = {
     "va": "No he trobat en el corpus indexat cap fragment prou rellevant per a respondre esta pregunta.",
     "es": "No he encontrado en el corpus indexado ningún fragmento suficientemente relevante para responder a esta pregunta.",
@@ -217,12 +227,20 @@ def format_contexts(contexts: list[Context]) -> str:
     return "\n\n".join(blocks)
 
 
-def build_messages(question: str, contexts: list[Context], lang: str = "va") -> list[dict[str, str]]:
+def format_attachments(blocks: list[dict], lang: str = "va") -> str:
+    """Bloques de documentos adjuntos (`attachments.attachment_blocks`): «[D1] nombre, pág. 3» y el texto."""
+    page = _PAGE.get(lang, _PAGE["va"])
+    return "\n\n".join(f"[{b['ref']}] {b['name']}" + (f", {page} {b['page']}" if b.get("page") else "") + f"\n{b['text']}"
+                       for b in blocks)
+
+
+def build_messages(question: str, contexts: list[Context], lang: str = "va",
+                   attachments: list[dict] | None = None) -> list[dict[str, str]]:
     lang = lang if lang in SYSTEM else "va"
-    return [
-        {"role": "system", "content": SYSTEM[lang]},
-        {"role": "user", "content": USER[lang].format(contexts=format_contexts(contexts), question=question)},
-    ]
+    user = USER[lang].format(contexts=format_contexts(contexts) or NO_FRAGMENTS[lang], question=question)
+    if attachments:
+        user = ATTACHMENTS[lang].format(blocks=format_attachments(attachments, lang)) + "\n\n" + user
+    return [{"role": "system", "content": SYSTEM[lang]}, {"role": "user", "content": user}]
 
 
 def build_condense_messages(question: str, history: list[dict], lang: str = "va") -> list[dict[str, str]]:

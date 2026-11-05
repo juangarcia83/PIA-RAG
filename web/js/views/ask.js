@@ -1,5 +1,5 @@
 // Preguntar: ejecuta una arquitectura en streaming y enseña cada etapa mientras ocurre.
-import { cached, getJSON, postJSON, streamRun } from "../api.js";
+import { cached, getJSON, postJSON, streamRun, uploadAttachment } from "../api.js";
 import { h, hero, icon, seg, esc, fmtMs, fmtScore, fmtNum, fmtDate, short, bindTip, chunkTip, renderAnswer, toast, store, PIPES, PIPE_ORDER, sleep } from "../ui.js";
 import { t } from "../i18n.js";
 import { PipelineGraph } from "../viz/pipeline.js";
@@ -27,6 +27,8 @@ const TIMING_LABELS = { retrieval: "Retrieval", rerank: "Reranking", query_rewri
 const VERDICTS = { correct: "correcto", ambiguous: "ambiguo", incorrect: "abstención" };
 const CHAT_TURNS = 20;     // turnos de conversación guardados en el navegador
 const CHAT_HISTORY = 4;    // turnos anteriores que se envían con cada pregunta
+const ATTACH_ACCEPT = ".pdf,.docx,.txt,.md";
+const ATTACH_MAX = 3;      // documentos adjuntos por conversación (el servidor admite 3 por pregunta)
 
 // ------------------------------------------------------------------ piezas reutilizables
 export function timingBar(timings) {
@@ -83,8 +85,10 @@ function linkCitations(root, sourcesEl) {
 // teclado. Una sola ventana para toda la página, que se queda abierta mientras el ratón está encima.
 let citePop = null, citeTimer = 0, citeAnchor = null;
 
-function citePopovers(root, contexts, chunker) {
-  const byN = Object.fromEntries(contexts.map((c) => [String(c.n), c]));
+function citePopovers(root, contexts, chunker, attachments = []) {
+  // fuentes del DOGV por número y fragmentos de documentos adjuntos por referencia (D1, D2…)
+  const byN = Object.fromEntries([...contexts.map((c) => [String(c.n), c]),
+    ...attachments.map((b) => [b.ref, { n: b.ref, title: b.name, page: b.page, text: b.text, attachment: true }])]);
   root.querySelectorAll(".cite").forEach((el) => {
     const c = byN[el.dataset.n];
     if (!c) return;
@@ -131,9 +135,11 @@ function showCite(anchor, c, chunker) {
     h("div", { class: "cite-pop-head" }, h("span", { class: "src-n", "aria-hidden": "true" }, c.n),
       h("div", { class: "src-title", translate: "no" }, short(c.title || t("(sin título)"), 170)),
       h("button", { class: "icon-btn cite-pop-close", "aria-label": t("Cerrar"), onclick: () => hideCite(true) }, icon("close"))),
-    h("div", { class: "src-meta" }, h("span", { class: "mono" }, c.code), h("span", {}, fmtDate(c.date)), h("span", {}, short(c.organismo, 48))),
+    c.attachment
+      ? h("div", { class: "src-meta" }, h("span", {}, t("Documento adjunto")), c.page ? h("span", {}, t("pág. {n}", { n: c.page })) : null)
+      : h("div", { class: "src-meta" }, h("span", { class: "mono" }, c.code), h("span", {}, fmtDate(c.date)), h("span", {}, short(c.organismo, 48))),
     h("p", { class: "cite-pop-text", translate: "no", tabindex: 0 }, citeExcerpt(c)),
-    h("div", { class: "src-actions" },
+    c.attachment ? null : h("div", { class: "src-actions" },
       h("button", { class: "btn ghost sm", onclick: () => { hideCite(); openDocAtText(c.doc, c.text, chunker); } }, t("Abrir disposición")),
       c.url ? h("a", { class: "btn ghost sm", href: c.url, target: "_blank", rel: "noopener" }, "PDF ↗", h("span", { class: "sr-only" }, t("(se abre en otra pestaña)"))) : null));
   citePop.classList.add("show");
@@ -191,7 +197,82 @@ export function askView(root, state, { restore = false } = {}) {
   const modelPick = seg([["naive", t("Estándar")], ["advanced", t("Avanzado")]], stdModel, (v) => { stdModel = v; store("stdModel", v); });
   modelPick.classList.add("model-pick", "std-only");
   modelPick.setAttribute("aria-label", t("Modelo"));
-  const searchBox = h("div", { class: "search-box" }, ta, modelPick, go);
+
+  // ---------- documentos adjuntos (modo simple): botón «+», etiquetas y arrastrar y soltar sobre la caja
+  // Los documentos son de la conversación: se envían con cada pregunta hasta que se quitan o se empieza otra. Al volver
+  // al inicio con una conversación guardada, sus documentos quedan aparcados (`parked`) y no se ven: lo que se adjunte
+  // ahí es para una conversación nueva. «Retomarla» los recupera; una pregunta nueva los descarta con la conversación.
+  const valid = (list) => (list || []).filter((a) => a.id);
+  const parkedAtStart = (store("chat") || []).length > 0 && store("chatOpen") === false;
+  let attachments = valid(parkedAtStart ? store("draftAttachments") : store("chatAttachments"));   // los visibles
+  let parked = parkedAtStart ? valid(store("chatAttachments")) : [];                                // los aparcados
+  const fileInput = h("input", { type: "file", accept: ATTACH_ACCEPT, multiple: true, class: "sr-only", tabindex: -1,
+    "aria-hidden": "true", onchange: (e) => { addFiles([...e.target.files]); e.target.value = ""; } });
+  const attachBtn = h("button", { type: "button", class: "attach-btn std-only", title: t("Adjuntar un documento (PDF, DOCX o TXT)"),
+    "aria-label": t("Adjuntar un documento (PDF, DOCX o TXT)"), onclick: () => fileInput.click() }, icon("plus"));
+  const attachRow = h("div", { class: "attach-row std-only hidden", role: "group", "aria-label": t("Documentos adjuntos") });
+  function saveAttachments() {
+    const ready = attachments.filter((a) => !a.busy);
+    const isParked = !sessionOpen && thread.childElementCount > 0;
+    store("chatAttachments", isParked ? parked : ready);
+    store("draftAttachments", isParked ? ready : []);
+  }
+  // borra del servidor los documentos de una conversación que se descarta
+  const dropAttachments = (list) => list.forEach((a) => a.id && fetch(`/api/attachments/${a.id}`, { method: "DELETE" }).catch(() => {}));
+  function paintAttachments() {
+    attachRow.classList.toggle("hidden", !attachments.length);
+    attachRow.replaceChildren(
+      ...attachments.map((a) => h("span", { class: `att-chip${a.busy ? " busy" : ""}` },
+        a.busy ? h("span", { class: "spinner", "aria-hidden": "true" }) : icon("doc"),
+        h("span", { class: "att-name", title: a.name }, short(a.name, 42)),
+        h("span", { class: "att-meta" }, a.busy ? t("Procesando…") : a.pages ? t("{n} pág.", { n: a.pages }) : ""),
+        a.busy ? null : h("button", { type: "button", class: "att-x", "aria-label": t("Quitar «{name}»", { name: a.name }),
+          onclick: () => removeAttachment(a) }, icon("close")))),
+      h("span", { class: "att-note" }, t("El texto de los documentos se envía al modelo generativo para responder.")));
+  }
+  async function addFiles(files) {
+    for (const file of files) {
+      if (attachments.length >= ATTACH_MAX) { toast(t("Como máximo {n} documentos por conversación.", { n: ATTACH_MAX })); break; }
+      const tmp = { name: file.name, busy: true };
+      attachments.push(tmp);
+      paintAttachments();
+      try {
+        Object.assign(tmp, await uploadAttachment(file), { busy: false });
+      } catch (e) {
+        attachments = attachments.filter((a) => a !== tmp);
+        toast(e.message);
+      }
+      paintAttachments();
+      saveAttachments();
+    }
+  }
+  function removeAttachment(a) {
+    attachments = attachments.filter((x) => x !== a);
+    dropAttachments([a]);
+    paintAttachments();
+    saveAttachments();
+  }
+  // los guardados en el navegador pueden haberse perdido si el servidor se ha reiniciado
+  for (const a of [...attachments, ...parked]) {
+    getJSON(`/api/attachments/${a.id}`).catch(() => {
+      attachments = attachments.filter((x) => x !== a);
+      parked = parked.filter((x) => x !== a);
+      paintAttachments();
+      saveAttachments();
+      toast(t("«{name}» ya no está en el servidor: vuelve a adjuntarlo.", { name: a.name }));
+    });
+  }
+  paintAttachments();
+
+  const searchBox = h("div", { class: "search-box" }, attachBtn, ta, modelPick, go, fileInput);
+  for (const [type, on] of [["dragenter", true], ["dragover", true], ["dragleave", false], ["drop", false]]) {
+    searchBox.addEventListener(type, (e) => {
+      if (mode !== "standard" || !e.dataTransfer?.types?.includes("Files")) return;
+      e.preventDefault();
+      searchBox.classList.toggle("drop", on);
+      if (type === "drop") addFiles([...e.dataTransfer.files]);
+    });
+  }
 
   const pipeSeg = seg(PIPE_ORDER.map((p) => [p, t(PIPES[p].label)]), pipeline, (v) => { pipeline = v; store("pipeline", v); options = {}; paintSettings(); paintPipeHint(); },
     { colors: Object.fromEntries(PIPE_ORDER.map((p) => [p, PIPES[p].color])) });
@@ -316,7 +397,8 @@ export function askView(root, state, { restore = false } = {}) {
   const resumeBar = h("div", { class: "resume-bar", role: "region", "aria-label": t("Conversación guardada") },
     icon("chat"), resumeCount,
     h("button", { class: "btn secondary sm", onclick: () => openSession() }, t("Retomarla")),
-    h("button", { class: "btn ghost sm", onclick: () => newChat() }, t("Nueva conversación")));
+    h("button", { class: "btn ghost sm", onclick: () => newChat() }, t("Nueva conversación")),
+    h("span", { class: "resume-hint" }, t("Si escribes una pregunta, empezará una conversación nueva y esta se descartará.")));
 
   // la constelación usa la proyección real del índice avanzado
   const artCanvas = h("canvas", { "aria-hidden": "true" });
@@ -341,6 +423,7 @@ export function askView(root, state, { restore = false } = {}) {
     chatBar, thread,
     // en una conversación, la caja de pregunta queda fija abajo, como en un chat
     h("div", { class: "composer" },
+      attachRow,
       h("div", { class: "search" }, searchBox),
       resumeBar,
       h("div", { class: "toolbar adv-only" }, pipeSeg,
@@ -370,16 +453,39 @@ export function askView(root, state, { restore = false } = {}) {
     store("chatOpen", open);
     paintChat();
   }
+  // «Retomarla»: vuelve a la conversación guardada con sus documentos (lo adjuntado en el inicio se descarta)
   function openSession() {
+    if (sessionOpen) return;
+    dropAttachments(attachments);
+    attachments = parked;
+    parked = [];
     setSession(true);
+    saveAttachments();
+    paintAttachments();
     thread.lastElementChild?.scrollIntoView({ block: "start" });
     ta.focus();
   }
-  // «Inicio»: vuelve a la pantalla inicial; la conversación queda guardada para retomarla
+  // «Inicio»: vuelve a la pantalla inicial, que es el principio de una conversación nueva; la actual queda guardada
+  // (con sus documentos aparcados) para retomarla
   function closeSession() {
+    if (!sessionOpen) return;
+    parked = attachments.filter((a) => !a.busy);
+    attachments = [];
     setSession(false);
+    saveAttachments();
+    paintAttachments();
     scrollTo({ top: 0 });
     ta.focus();
+  }
+  // una pregunta escrita en el inicio empieza una conversación nueva: la guardada se descarta con sus documentos
+  function startNewConversation() {
+    dropAttachments(parked);
+    parked = [];
+    chat = [];
+    store("chat", chat);
+    thread.replaceChildren();
+    setSession(true);
+    saveAttachments();
   }
   function addTurn(question) {
     const body = h("div");
@@ -407,24 +513,34 @@ export function askView(root, state, { restore = false } = {}) {
     chat = [];
     store("chat", chat);
     thread.replaceChildren();
+    dropAttachments([...attachments, ...parked]);   // los adjuntos son de la conversación
+    attachments = [];
+    parked = [];
+    paintAttachments();
     setSession(true);   // la siguiente pregunta abre una sesión nueva
+    saveAttachments();
     scrollTo({ top: 0 });
     ta.focus();
   }
   async function askChat(q) {
+    if (attachments.some((a) => a.busy)) {
+      toast(t("Espera a que termine de procesarse el documento."));
+      go.disabled = !ta.value.trim();
+      return;
+    }
     const pipe = stdModel;
+    if (!sessionOpen) startNewConversation();   // desde el inicio: conversación nueva (la guardada se descarta)
     // historial: la pregunta tal como la entendió el servidor y el principio de la respuesta
     const history = chat.slice(-CHAT_HISTORY).map((x) => ({ question: x.result.question || x.question, answer: short(x.result.answer || "", 1200) }));
     ta.value = "";
     autosize();
-    // preguntar desde la pantalla inicial continúa la conversación guardada (no la pierde) y abre la sesión
-    if (!sessionOpen) setSession(true);
     const { turn, body } = addTurn(q);
     turn.scrollIntoView({ behavior: "smooth", block: "start" });
     const run = new RunPanel(body, pipe, st, q, { simple: true, scroll: false, onExpand: () => expand(run.snapshot()) });
     searchBox.classList.add("busy");
     try {
-      await streamRun({ question: q, pipeline: pipe, history, generate: st.llm.available }, (ev) => run.onEvent(ev), controller.signal);
+      await streamRun({ question: q, pipeline: pipe, history, generate: st.llm.available, attachments: attachments.map((a) => a.id) },
+        (ev) => run.onEvent(ev), controller.signal);
       const snap = run.snapshot();
       state.lastRun = snap;
       if (snap.result) {
@@ -648,7 +764,7 @@ class RunPanel {
     } else {
       this.answerBody.innerHTML = renderAnswer(ev.answer);
       stagger(this.answerBody);
-      if (this.simple) citePopovers(this.answerBody, ev.contexts, this.cfg.contextual ? "advanced" : "naive");
+      if (this.simple) citePopovers(this.answerBody, ev.contexts, this.cfg.contextual ? "advanced" : "naive", ev.attachments || []);
       else linkCitations(this.answerBody, this.sourcesEl);
       const btn = h("button", { class: "btn ghost sm", onclick: () => this.grounding(btn) }, icon("check"), t("Comprobar fundamentación"));
       this.groundBtn.replaceChildren(btn);
@@ -672,6 +788,7 @@ class RunPanel {
       const model = this.p === "naive" ? t("Estándar") : t("Avanzado");
       this.metaEl.replaceChildren(
         h("span", {}, ev.contexts.length === 1 ? t("1 fuente") : t("{n} fuentes", { n: ev.contexts.length })),
+        ev.attachments?.length ? h("span", {}, t("+ documento adjunto")) : null,
         h("span", {}, model),
         this.onExpand ? h("button", { class: "linkish", onclick: this.onExpand }, t("Ver cómo se ha encontrado")) : null);
       this.metaEl.classList.remove("hidden");

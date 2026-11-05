@@ -13,6 +13,12 @@ export const getJSON = (url) => fetch(url).then(handle);
 export const postJSON = (url, body) =>
   fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(handle);
 
+/** Sube un documento adjunto (PDF, DOCX, TXT) como cuerpo binario; devuelve su ficha ({id, name, pages, mode…}). */
+export const uploadAttachment = (file) =>
+  fetch(`/api/attachments?name=${encodeURIComponent(file.name)}`, {
+    method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file,
+  }).then(handle);
+
 const cache = new Map();
 /** GET con caché en memoria para recursos que no cambian durante la sesión. */
 export function cached(url) {

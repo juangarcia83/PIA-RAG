@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import prompts
 from .generation import Generator
@@ -109,6 +109,8 @@ class _Base:
     max_context_chars: int = 12000
     max_tokens: int = 1000        # la resposta estructurada (Resposta / Detall / Observacions) és més llarga
     temperature: float = 0.1
+    # bloques de documentos adjuntos por el usuario (attachments.attachment_blocks) para la consulta en curso
+    attachments: list = field(default_factory=list)
 
     def search(self, question: str, filters: Filters | None = None, k: int | None = None) -> tuple[list[Hit], dict]:
         raise NotImplementedError
@@ -125,12 +127,13 @@ class _Base:
         contexts, trace = self.retrieve(question, filters)
         timings = dict(trace.pop("timings", None) or {"retrieval": time.perf_counter() - t0})
         t1 = time.perf_counter()
-        if trace.get("abstain") or not contexts:
+        # con documentos adjuntos se responde aunque el DOGV no tenga nada: la respuesta puede estar en ellos
+        if (trace.get("abstain") or not contexts) and not self.attachments:
             answer = prompts.ABSTAIN[self.answer_lang]
         elif not self.generator.available:
             answer = prompts.NO_LLM[self.answer_lang]
         else:
-            messages = prompts.build_messages(question, contexts, self.answer_lang)
+            messages = prompts.build_messages(question, contexts, self.answer_lang, self.attachments)
             answer = self.generator.generate(messages, self.max_tokens, self.temperature)
             answer = answer or "(El LLM ha devuelto una respuesta vacía: prueba a subir max_tokens.)"
         timings["generation"] = time.perf_counter() - t1
